@@ -313,4 +313,4 @@ function CurvesExplainer(){
   );
 }
 
-export default App;
+
