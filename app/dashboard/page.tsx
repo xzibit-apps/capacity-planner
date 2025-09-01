@@ -368,10 +368,9 @@ export default function Dashboard() {
           </Typography>
           <Box
             sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 3,
-              flexWrap: "wrap",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: 2,
               mt: 2,
               p: 2,
               backgroundColor: "rgba(255,255,255,0.08)",
@@ -383,15 +382,22 @@ export default function Dashboard() {
             {/* Probability Slider */}
             <Box
               sx={{
-                minWidth: 200,
                 display: "flex",
                 flexDirection: "column",
                 gap: 1,
+                minHeight: 60,
+                justifyContent: "center",
               }}
             >
               <Typography
                 variant="body2"
-                sx={{ opacity: 0.9, fontWeight: 500, fontSize: "0.875rem" }}
+                sx={{ 
+                  opacity: 0.9, 
+                  fontWeight: 500, 
+                  fontSize: "0.875rem",
+                  mb: 0.5,
+                  textAlign: "center"
+                }}
               >
                 Probability ≥ {probability.toFixed(1)}
               </Typography>
@@ -429,202 +435,225 @@ export default function Dashboard() {
             </Box>
 
             {/* Include Site Install Checkbox */}
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={includeOnsite}
-                  onChange={(e) => setIncludeOnsite(e.target.checked)}
-                  sx={{
-                    color: "rgba(255,255,255,0.8)",
-                    "&.Mui-checked": {
-                      color: "white",
-                    },
-                    "& .MuiSvgIcon-root": {
-                      fontSize: 20,
-                    },
-                  }}
-                />
-              }
-              label={
-                <Typography
-                  variant="body2"
-                  sx={{ color: "white", fontWeight: 500, fontSize: "0.875rem" }}
-                >
-                  Include site install
-                </Typography>
-              }
-              sx={{ margin: 0, minWidth: 140 }}
-            />
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                alignItems: "center",
+                minHeight: 60,
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={includeOnsite}
+                    onChange={(e) => setIncludeOnsite(e.target.checked)}
+                    sx={{
+                      color: "rgba(255,255,255,0.8)",
+                      "&.Mui-checked": {
+                        color: "white",
+                      },
+                      "& .MuiSvgIcon-root": {
+                        fontSize: 20,
+                      },
+                    }}
+                  />
+                }
+                label={
+                  <Typography
+                    variant="body2"
+                    sx={{ color: "white", fontWeight: 500, fontSize: "0.875rem" }}
+                  >
+                    Include site install
+                  </Typography>
+                }
+                sx={{ margin: 0 }}
+              />
+            </Box>
 
             {/* Date Preset Buttons */}
-            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+            <Box 
+              sx={{ 
+                display: "flex", 
+                flexDirection: "column",
+                gap: 1,
+                justifyContent: "center",
+                minHeight: 60,
+              }}
+            >
               <Typography
                 variant="body2"
                 sx={{
                   opacity: 0.9,
                   fontWeight: 500,
                   fontSize: "0.875rem",
-                  mr: 1,
+                  textAlign: "center",
+                  mb: 0.5,
                 }}
               >
-                Quick:
+                Quick Presets
               </Typography>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  setStartDate(dayjs().startOf("day"));
-                  setEndDate(dayjs().add(12, "month").endOf("day"));
-                }}
-                sx={{
-                  color: "white",
-                  borderColor: "white",
-                  borderWidth: 1.5,
-                  textTransform: "none",
-                  borderRadius: 2,
-                  px: 2,
-                  py: 0.5,
-                  fontSize: "0.75rem",
-                  fontWeight: 500,
-                  minWidth: 100,
-                  ...(isNextActive
-                    ? {
-                        backgroundColor: "rgba(255,255,255,0.2)",
-                        fontWeight: 600,
-                      }
-                    : {}),
-                  "&:hover": {
+              <Box sx={{ display: "flex", gap: 1, justifyContent: "center" }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    setStartDate(dayjs().startOf("day"));
+                    setEndDate(dayjs().add(12, "month").endOf("day"));
+                  }}
+                  sx={{
+                    color: "white",
                     borderColor: "white",
-                    backgroundColor: "rgba(255,255,255,0.1)",
-                  },
-                }}
-              >
-                Next 12m
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  setStartDate(dayjs().subtract(12, "month").startOf("day"));
-                  setEndDate(dayjs().endOf("day"));
-                }}
-                sx={{
-                  color: "white",
-                  borderColor: "white",
-                  borderWidth: 1.5,
-                  textTransform: "none",
-                  borderRadius: 2,
-                  px: 2,
-                  py: 0.5,
-                  fontSize: "0.75rem",
-                  fontWeight: 500,
-                  minWidth: 100,
-                  ...(isPrevActive
-                    ? {
-                        backgroundColor: "rgba(255,255,255,0.2)",
-                        fontWeight: 600,
-                      }
-                    : {}),
-                  "&:hover": {
+                    borderWidth: 1.5,
+                    textTransform: "none",
+                    borderRadius: 2,
+                    px: 1.5,
+                    py: 0.5,
+                    fontSize: "0.75rem",
+                    fontWeight: 500,
+                    minWidth: 70,
+                    ...(isNextActive
+                      ? {
+                          backgroundColor: "rgba(255,255,255,0.2)",
+                          fontWeight: 600,
+                        }
+                      : {}),
+                    "&:hover": {
+                      borderColor: "white",
+                      backgroundColor: "rgba(255,255,255,0.1)",
+                    },
+                  }}
+                >
+                  Next 12m
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    setStartDate(dayjs().subtract(12, "month").startOf("day"));
+                    setEndDate(dayjs().endOf("day"));
+                  }}
+                  sx={{
+                    color: "white",
                     borderColor: "white",
-                    backgroundColor: "rgba(255,255,255,0.1)",
-                  },
-                }}
-              >
-                Prev 12m
-              </Button>
+                    borderWidth: 1.5,
+                    textTransform: "none",
+                    borderRadius: 2,
+                    px: 1.5,
+                    py: 0.5,
+                    fontSize: "0.75rem",
+                    fontWeight: 500,
+                    minWidth: 70,
+                    ...(isPrevActive
+                      ? {
+                          backgroundColor: "rgba(255,255,255,0.2)",
+                          fontWeight: 600,
+                        }
+                      : {}),
+                    "&:hover": {
+                      borderColor: "white",
+                      backgroundColor: "rgba(255,255,255,0.1)",
+                    },
+                  }}
+                >
+                  Prev 12m
+                </Button>
+              </Box>
             </Box>
 
             {/* Date Pickers */}
             <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-                <Box sx={{ minWidth: 140 }}>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      mb: 0.5,
-                      opacity: 0.9,
-                      fontWeight: 500,
-                      fontSize: "0.75rem",
-                    }}
-                  >
-                    Start date
-                  </Typography>
-                  <DatePicker
-                    value={startDate}
-                    onChange={(v) => v && setStartDate(v)}
-                    slotProps={{
-                      textField: {
-                        size: "small",
-                        sx: {
-                          "& .MuiInputBase-root": {
-                            backgroundColor: "rgba(255,255,255,0.15)",
-                            color: "white",
-                            borderRadius: 1.5,
-                            border: "1px solid rgba(255,255,255,0.3)",
-                          },
-                          "& .MuiInputBase-input": {
-                            color: "white",
-                            fontSize: "0.875rem",
-                            padding: "8px 12px",
-                          },
-                          "& .MuiSvgIcon-root": {
-                            color: "white",
-                            fontSize: "1.2rem",
-                          },
-                          "& .MuiOutlinedInput-notchedOutline": {
-                            border: "none",
-                          },
-                        },
-                      },
-                    }}
-                  />
-                </Box>
-                <Box sx={{ minWidth: 140 }}>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      mb: 0.5,
-                      opacity: 0.9,
-                      fontWeight: 500,
-                      fontSize: "0.75rem",
-                    }}
-                  >
-                    End date
-                  </Typography>
-                  <DatePicker
-                    value={endDate}
-                    sx={{
-                      border: "1px solid white",
-                    }}
-                    onChange={(v) => v && setEndDate(v)}
-                    slotProps={{
-                      textField: {
-                        size: "small",
-                        sx: {
-                          border: "1px solid white",
-                          "& .MuiInputBase-root": {
-                            backgroundColor: "rgba(255,255,255,0.15)",
-                            color: "#fff !important",
-                            borderRadius: 1.5,
-                            border: "1px solid #fff important",
-                          },
-                          "& .MuiInputBase-input": {
-                            color: "white",
-                            fontSize: "0.875rem",
-                            padding: "8px 12px",
-                          },
-                          "& .MuiSvgIcon-root": {
-                            color: "white",
-                            fontSize: "1.2rem",
-                          },
-                          "& .MuiOutlinedInput-notchedOutline": {
-                            border: "none",
+              <Box 
+                sx={{ 
+                  display: "flex", 
+                  flexDirection: "column",
+                  gap: 1,
+                  justifyContent: "center",
+                  minHeight: 60,
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{
+                    opacity: 0.9,
+                    fontWeight: 500,
+                    fontSize: "0.875rem",
+                    textAlign: "center",
+                    mb: 0.5,
+                  }}
+                >
+                  Date Range
+                </Typography>
+                <Box sx={{ display: "flex", gap: 1, justifyContent: "center" }}>
+                  <Box sx={{ minWidth: 100 }}>
+                    <DatePicker
+                      value={startDate}
+                      onChange={(v) => v && setStartDate(v)}
+                      slotProps={{
+                        textField: {
+                          size: "small",
+                          placeholder: "Start",
+                          sx: {
+                            border: "1px solid white",
+                            "& .MuiInputBase-root": {
+                              color: "white",
+                              border: "1px solid white",
+                              borderRadius: 1,
+                              "&:hover": {
+                                borderColor: "rgba(255,255,255,0.8)",
+                              },
+                            },
+                            "& .MuiPickersInputBase-root.MuiPickersOutlinedInput-root.MuiPickersInputBase-colorPrimary.MuiPickersInputBase-inputSizeSmall.MuiPickersInputBase-adornedEnd.css-1cgg4mh-MuiPickersInputBase-root-MuiPickersOutlinedInput-root": {
+                              color: "white",
+                              
+                            },
+                            "& .MuiSvgIcon-root": {
+                              color: "white",
+                              fontSize: "1rem",
+                            },
+                            "& .MuiOutlinedInput-notchedOutline": {
+                              border: "none",
+                            },
                           },
                         },
-                      },
-                    }}
-                  />
+                      }}
+                    />
+                  </Box>
+                  <Box sx={{ minWidth: 100 }}>
+                    <DatePicker
+                      value={endDate}
+                      onChange={(v) => v && setEndDate(v)}
+                      slotProps={{
+                        textField: {
+                          size: "small",
+                          placeholder: "End",
+                          sx: {
+                            border: "1px solid white",
+                            "& .MuiInputBase-root": {
+                              color: "white",
+                              border: "1px solid white",
+                              borderRadius: 1,
+                              "&:hover": {
+                                borderColor: "rgba(255,255,255,0.8)",
+                              },
+                            },
+                            "& .MuiPickersInputBase-root.MuiPickersOutlinedInput-root.MuiPickersInputBase-colorPrimary.MuiPickersInputBase-inputSizeSmall.MuiPickersInputBase-adornedEnd.css-1cgg4mh-MuiPickersInputBase-root-MuiPickersOutlinedInput-root": {
+                              color: "white",
+                              
+                            },
+                            "& .MuiSvgIcon-root": {
+                              color: "white",
+                              fontSize: "1rem",
+                            },
+                            "& .MuiOutlinedInput-notchedOutline": {
+                              border: "none",
+                            },
+                          },
+                        },
+                      }}
+                    />
+                  </Box>
                 </Box>
               </Box>
             </LocalizationProvider>
@@ -633,57 +662,72 @@ export default function Dashboard() {
             <Box
               sx={{
                 display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
                 alignItems: "center",
-                gap: 2,
-                ml: "auto",
-                pl: 2,
+                minHeight: 60,
                 borderLeft: "1px solid rgba(255,255,255,0.2)",
+                pl: 2,
               }}
             >
-              <Box sx={{ textAlign: "center" }}>
-                <Typography
-                  variant="h6"
-                  sx={{
-                    color: "white",
-                    fontWeight: 600,
-                    mb: 0,
-                    fontSize: "1.1rem",
-                  }}
-                >
-                  {filtered.length}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{ color: "rgba(255,255,255,0.8)", fontSize: "0.7rem" }}
-                >
-                  Projects
-                </Typography>
-              </Box>
-              <Box
+              <Typography
+                variant="body2"
                 sx={{
-                  width: "1px",
-                  height: "30px",
-                  backgroundColor: "rgba(255,255,255,0.2)",
+                  opacity: 0.9,
+                  fontWeight: 500,
+                  fontSize: "0.875rem",
+                  textAlign: "center",
+                  mb: 0.5,
                 }}
-              />
-              <Box sx={{ textAlign: "center" }}>
-                <Typography
-                  variant="h6"
+              >
+                Summary
+              </Typography>
+              <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                <Box sx={{ textAlign: "center" }}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      color: "white",
+                      fontWeight: 600,
+                      mb: 0,
+                      fontSize: "1.1rem",
+                    }}
+                  >
+                    {filtered.length}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: "rgba(255,255,255,0.8)", fontSize: "0.7rem" }}
+                  >
+                    Projects
+                  </Typography>
+                </Box>
+                <Box
                   sx={{
-                    color: "white",
-                    fontWeight: 600,
-                    mb: 0,
-                    fontSize: "1.1rem",
+                    width: "1px",
+                    height: "30px",
+                    backgroundColor: "rgba(255,255,255,0.2)",
                   }}
-                >
-                  {staff.length}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{ color: "rgba(255,255,255,0.8)", fontSize: "0.7rem" }}
-                >
-                  Staff
-                </Typography>
+                />
+                <Box sx={{ textAlign: "center" }}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      color: "white",
+                      fontWeight: 600,
+                      mb: 0,
+                      fontSize: "1.1rem",
+                    }}
+                  >
+                    {staff.length}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: "rgba(255,255,255,0.8)", fontSize: "0.7rem" }}
+                  >
+                    Staff
+                  </Typography>
+                </Box>
               </Box>
             </Box>
           </Box>
