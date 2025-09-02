@@ -44,6 +44,9 @@ function toISO(d: Date): string {
 }
 
 function parseISODate(iso: string): Date {
+  if (!iso || typeof iso !== 'string') {
+    return new Date();
+  }
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
 }
@@ -75,10 +78,15 @@ function countWeekdaysInRangeInclusive(a: Date, b: Date) {
 }
 
 function isPastInstall(p: any, todayISO: string) {
-  if (!p.truckDate) return false;
-  const truck = parseISODate(p.truckDate);
-  const last = p.onsite?.weeks ? addDays(truck, 7 * p.onsite.weeks) : truck;
-  return last < parseISODate(todayISO);
+  if (!p.truckDate || !todayISO) return false;
+  try {
+    const truck = parseISODate(p.truckDate);
+    const last = p.onsite?.weeks ? addDays(truck, 7 * p.onsite.weeks) : truck;
+    return last < parseISODate(todayISO);
+  } catch (error) {
+    console.warn('Error parsing dates in isPastInstall:', error);
+    return false;
+  }
 }
 
 function computeTimelineWeeks(
@@ -127,10 +135,11 @@ function computeWeeklyDemand(
     for (const s of Object.keys(perSkill)) perSkill[s][wk] = 0;
   }
   for (const p of projects) {
-    if (!p.truckDate) continue;
+    if (!p.truckDate || !p.truckDate.trim()) continue;
     const N = p.weeksBefore || 0;
-    const truckWeek = startOfWeekMonday(parseISODate(p.truckDate));
-    const skills = ["CNC", "Build", "Paint", "AV", "Pack & Load"];
+    try {
+      const truckWeek = startOfWeekMonday(parseISODate(p.truckDate));
+      const skills = ["CNC", "Build", "Paint", "AV", "Pack & Load"];
 
     for (const sk of skills) {
       const hours = p.hoursBySkill?.[sk] || 0;
@@ -190,6 +199,10 @@ function computeWeeklyDemand(
         total[week] += perWeek;
       }
     }
+    } catch (error) {
+      console.warn('Error processing project in computeWeeklyDemand:', error, p);
+      continue;
+    }
   }
   return { perSkill, total };
 }
@@ -212,14 +225,20 @@ function computeWeeklyCapacity(staff: any[], weekKeys: string[]) {
       const weekStart = parseISODate(wk);
       const weekEnd = addDays(weekStart, 6);
       let leaveDays = 0;
-      for (const rng of person.leave || []) {
-        const ls = new Date(rng.start);
-        const le = new Date(rng.end);
-        const segStart = new Date(Math.max(ls.getTime(), weekStart.getTime()));
-        const segEnd = new Date(Math.min(le.getTime(), weekEnd.getTime()));
-        if (segStart <= segEnd)
-          leaveDays += countWeekdaysInRangeInclusive(segStart, segEnd);
+      
+      // Handle new leave structure (individual dates)
+      for (const leaveItem of person.leave || []) {
+        const leaveDate = parseISODate(leaveItem.date);
+        // Check if this leave date falls within the current week
+        if (leaveDate >= weekStart && leaveDate <= weekEnd) {
+          // Count weekdays for this specific date
+          const dayOfWeek = leaveDate.getDay();
+          if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Monday to Friday
+            leaveDays += 1;
+          }
+        }
       }
+      
       leaveDays = Math.max(0, Math.min(leaveDays, 5));
       const workingDays = 5 - leaveDays;
       const weeklyHours =

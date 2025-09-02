@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Box, Card, CardContent, Typography, TextField, Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert } from '@mui/material';
 
-// Utility functions from the old React app
+// Utility functions for curve calculations
 function rampUpWeights(N: number): number[] { 
   const denom = (N * (N + 1)) / 2; 
   if (!denom) return []; 
@@ -39,8 +39,18 @@ function libraryWeights(projectType: string | undefined | null, skill: string, N
 }
 
 export default function CurvesExplainer() {
-  const [projectType, setProjectType] = useState<string>('');
+  const [selectedProjectType, setSelectedProjectType] = useState<string>('');
   const [weeks, setWeeks] = useState<number>(8);
+
+  // Fetch real data from projects and curve library
+  const { data: projectsData, isLoading: projectsLoading, error: projectsError } = useQuery({
+    queryKey: ['projects'],
+    queryFn: async () => {
+      const response = await fetch('/api/projects');
+      if (!response.ok) throw new Error('Failed to fetch projects');
+      return response.json();
+    }
+  });
 
   const { data: curveLibraryData, isLoading: curveLibraryLoading, error: curveLibraryError } = useQuery({
     queryKey: ['curve-library'],
@@ -51,38 +61,103 @@ export default function CurvesExplainer() {
     }
   });
 
+  // Get unique project types
   const projectTypes = useMemo(() => {
-    return curveLibraryData?.curves?.map((curve: any) => curve.name) || [];
-  }, [curveLibraryData]);
+    if (!projectsData) return [];
+    const types = projectsData.map((p: any) => p.projectType || 'Default').filter(Boolean);
+    const uniqueTypes = Array.from(new Set(types)) as string[];
+    return uniqueTypes;
+  }, [projectsData]);
+
+  // Define skills for the curves
+  const skills = ["CNC", "Build", "Paint", "AV", "Pack & Load"];
 
   // Set initial project type when data loads
   useMemo(() => {
-    if (projectTypes.length > 0 && !projectType) {
-      setProjectType(projectTypes[0]);
+    if (projectTypes.length > 0 && !selectedProjectType) {
+      const firstType = projectTypes[0];
+      if (firstType && typeof firstType === 'string') {
+        setSelectedProjectType(firstType);
+      }
     }
-  }, [projectTypes, projectType]);
+  }, [projectTypes, selectedProjectType]);
 
-  const skills = ["CNC", "Build", "Paint", "AV", "Pack & Load"];
+  // Get projects of selected type with matching build weeks
+  const matchingProjects = useMemo(() => {
+    if (!projectsData || !selectedProjectType) return [];
+    return projectsData.filter((p: any) => 
+      (p.projectType || 'Default') === selectedProjectType && 
+      p.weeksBefore === weeks
+    );
+  }, [projectsData, selectedProjectType, weeks]);
 
+  // Calculate aggregated project type statistics
+  const projectTypeStats = useMemo(() => {
+    if (!matchingProjects.length) return null;
+
+    // Aggregate data across all matching projects
+    const totalHours = matchingProjects.reduce((sum: number, project: any) => {
+      return sum + Object.values(project.hoursBySkill || {}).reduce((pSum: number, hours: any) => pSum + (hours || 0), 0);
+    }, 0);
+
+    const avgWeeksBefore = weeks; // Use the selected weeks
+    const avgOnsiteWeeks = matchingProjects.reduce((sum: number, project: any) => sum + (project.onsite?.weeks || 0), 0) / matchingProjects.length;
+    const totalWeeks = avgWeeksBefore + avgOnsiteWeeks;
+
+    // Get most common curve mode
+    const curveModes = matchingProjects.map((p: any) => p.curveMode || 'Mathematician');
+    const mostCommonCurveMode = curveModes.sort((a: string, b: string) => 
+      curveModes.filter((v: string) => v === a).length - curveModes.filter((v: string) => v === b).length
+    ).pop() || 'Mathematician';
+
+    return {
+      totalHours,
+      weeksBefore: avgWeeksBefore,
+      onsiteWeeks: avgOnsiteWeeks,
+      totalWeeks,
+      curveMode: mostCommonCurveMode,
+      projectCount: matchingProjects.length
+    };
+  }, [matchingProjects, weeks]);
+
+  // Generate chart datasets with skill-specific Mathematician curves
   const datasets = useMemo(() => {
-    const ws = Array.from({ length: weeks }, (_, i) => i + 1);
-    const mats: Record<string, number[]> = {} as any;
-    const lin = rampUpWeights(weeks);
-    const tri = triangularWeights(weeks);
-    
-    for (const sk of skills) { 
-      mats[sk] = libraryWeights(projectType, sk, weeks, curveLibraryData?.curves); 
-    }
-    
-    return ws.map(k => ({ 
-      label: `W${k}`, 
-      ...Object.fromEntries(skills.map(sk => [`Mathematician ${sk}`, Number((mats[sk][k - 1] || 0).toFixed(4))])), 
-      "Linear": Number((lin[k - 1] || 0).toFixed(4)), 
-      "Triangular": Number((tri[k - 1] || 0).toFixed(4)), 
-    }));
-  }, [projectType, weeks, curveLibraryData, skills]);
+    if (!curveLibraryData) return [];
 
-  if (curveLibraryLoading) {
+    const ws = Array.from({ length: weeks }, (_, i) => i + 1);
+    
+    // Generate chart data
+    return ws.map((weekNum, index) => {
+      const weekData: any = { 
+        label: `W${weekNum}`,
+        week: weekNum
+      };
+      
+      // Add skill-specific Mathematician curves from curve library
+      skills.forEach(skill => {
+        if (curveLibraryData?.curves) {
+          const skillCurve = libraryWeights(selectedProjectType, skill, weeks, curveLibraryData.curves);
+          weekData[skill] = Number((skillCurve[index] || 0).toFixed(4));
+        } else {
+          weekData[skill] = 0;
+        }
+      });
+      
+      // Add theoretical curves for comparison
+      const lin = rampUpWeights(weeks);
+      const tri = triangularWeights(weeks);
+      
+      weekData["Linear"] = Number((lin[index] || 0).toFixed(4));
+      weekData["Triangular"] = Number((tri[index] || 0).toFixed(4));
+      
+      return weekData;
+    });
+  }, [weeks, curveLibraryData, selectedProjectType]);
+
+  const isLoading = projectsLoading || curveLibraryLoading;
+  const hasError = projectsError || curveLibraryError;
+
+  if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
         <CircularProgress />
@@ -90,10 +165,10 @@ export default function CurvesExplainer() {
     );
   }
 
-  if (curveLibraryError) {
+  if (hasError) {
     return (
       <Alert severity="error">
-        Failed to load curve library. Please try refreshing the page.
+        Failed to load data. Please try refreshing the page.
       </Alert>
     );
   }
@@ -112,12 +187,13 @@ export default function CurvesExplainer() {
           </Typography>
           
           <Box sx={{ display: 'grid', gap: 3 }}>
+            {/* Project Type Selection Controls */}
             <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'end' }}>
               <FormControl sx={{ minWidth: 250 }}>
                 <InputLabel>Project Type</InputLabel>
                 <Select
-                  value={projectType}
-                  onChange={(e) => setProjectType(e.target.value)}
+                  value={selectedProjectType}
+                  onChange={(e) => setSelectedProjectType(e.target.value)}
                   label="Project Type"
                   sx={{
                     '& .MuiOutlinedInput-notchedOutline': {
@@ -131,7 +207,7 @@ export default function CurvesExplainer() {
                     },
                   }}
                 >
-                  {projectTypes.map((type: string) => (
+                  {projectTypes.map((type) => (
                     <MenuItem key={type} value={type}>{type}</MenuItem>
                   ))}
                 </Select>
@@ -141,8 +217,8 @@ export default function CurvesExplainer() {
                 label="Build Weeks"
                 type="number"
                 value={weeks}
-                inputProps={{ min: 1, max: 26 }}
-                onChange={(e) => setWeeks(Math.max(1, Math.min(26, Math.floor(Number(e.target.value) || 1))))}
+                inputProps={{ min: 1, max: 52 }}
+                onChange={(e) => setWeeks(Math.max(1, Math.min(52, Math.floor(Number(e.target.value) || 1))))}
                 sx={{ 
                   width: 150,
                   '& .MuiOutlinedInput-notchedOutline': {
@@ -157,7 +233,44 @@ export default function CurvesExplainer() {
                 }}
               />
             </Box>
+
+            {/* Project Type Statistics */}
+            {projectTypeStats && (
+              <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+                <Card sx={{ p: 2, bgcolor: '#f8f9fa', border: '1px solid #e9ecef' }}>
+                  <Typography variant="body2" color="text.secondary">Total Hours</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#667eea' }}>
+                    {projectTypeStats.totalHours.toFixed(1)}h
+                  </Typography>
+                </Card>
+                <Card sx={{ p: 2, bgcolor: '#f8f9fa', border: '1px solid #e9ecef' }}>
+                  <Typography variant="body2" color="text.secondary">Build Weeks</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#667eea' }}>
+                    {projectTypeStats.weeksBefore} weeks
+                  </Typography>
+                </Card>
+                <Card sx={{ p: 2, bgcolor: '#f8f9fa', border: '1px solid #e9ecef' }}>
+                  <Typography variant="body2" color="text.secondary">Onsite Weeks</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#667eea' }}>
+                    {projectTypeStats.onsiteWeeks.toFixed(1)} weeks
+                  </Typography>
+                </Card>
+                <Card sx={{ p: 2, bgcolor: '#f8f9fa', border: '1px solid #e9ecef' }}>
+                  <Typography variant="body2" color="text.secondary">Curve Mode</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#667eea' }}>
+                    {projectTypeStats.curveMode}
+                  </Typography>
+                </Card>
+                <Card sx={{ p: 2, bgcolor: '#f8f9fa', border: '1px solid #e9ecef' }}>
+                  <Typography variant="body2" color="text.secondary">Projects</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#667eea' }}>
+                    {projectTypeStats.projectCount}
+                  </Typography>
+                </Card>
+              </Box>
+            )}
             
+            {/* Chart */}
             <Box sx={{ height: 500, width: '100%' }}>
               <ResponsiveContainer>
                 <LineChart data={datasets}>
@@ -185,12 +298,14 @@ export default function CurvesExplainer() {
                       fontSize: '12px'
                     }}
                   />
-                  {skills.map((sk, index) => (
+                  
+                  {/* Skill-specific Mathematician curves */}
+                  {skills.map((skill, index) => (
                     <Line 
-                      key={sk} 
+                      key={skill} 
                       type="monotone" 
-                      dataKey={`Mathematician ${sk}`} 
-                      name={`${sk} (Mathematician)`}
+                      dataKey={skill} 
+                      name={`${skill} (Mathematician)`}
                       dot={false} 
                       strokeWidth={3}
                       stroke={[
@@ -209,22 +324,23 @@ export default function CurvesExplainer() {
                       }}
                     />
                   ))}
+                  
+                  {/* Theoretical curves */}
                   <Line 
                     type="monotone" 
                     dataKey="Linear" 
                     name="Linear"
                     dot={false} 
-                    strokeWidth={3}
-                    stroke="#a8a8a8"
-                    strokeDasharray="5 5"
-                    activeDot={{ r: 6, stroke: '#a8a8a8', strokeWidth: 2 }}
+                    strokeWidth={2}
+                    stroke="#feca57"
+                    activeDot={{ r: 6, stroke: '#feca57', strokeWidth: 2 }}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="Triangular" 
                     name="Triangular"
                     dot={false} 
-                    strokeWidth={3}
+                    strokeWidth={2}
                     stroke="#6c5ce7"
                     strokeDasharray="10 5"
                     activeDot={{ r: 6, stroke: '#6c5ce7', strokeWidth: 2 }}
@@ -233,6 +349,7 @@ export default function CurvesExplainer() {
               </ResponsiveContainer>
             </Box>
             
+            {/* Information Card */}
             <Card sx={{ 
               backgroundColor: '#f8f9fa',
               border: '1px solid #e9ecef',
@@ -240,8 +357,8 @@ export default function CurvesExplainer() {
             }}>
               <CardContent sx={{ p: 2 }}>
                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13, lineHeight: 1.5 }}>
-                  <strong>Mathematician curves</strong> are pulled per project type & skill from your original workbook (sheet "Stats"). 
-                  We resample and normalise to 1. <strong>Triangular</strong> is Option A (peak at truck, pre-truck only). 
+                  <strong>Mathematician curves</strong> are pulled per project type & skill from your original workbook (sheet "Stats"). We resample and normalise to 1. 
+                  <strong>Triangular</strong> is Option A (peak at truck, pre-truck only). 
                   <strong>Linear</strong> represents a uniform distribution of workload across the build period.
                 </Typography>
               </CardContent>

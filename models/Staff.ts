@@ -12,8 +12,9 @@ export interface IStaff extends Document {
     'Pack & Load': boolean;
   };
   leave: Array<{
-    start: string;
-    end: string;
+    date: string; // Single date instead of range
+    leaveType: string; // e.g., 'Annual', 'Sick', 'Personal', 'Holiday'
+    notes?: string;
   }>;
   createdAt: Date;
   updatedAt: Date;
@@ -40,8 +41,9 @@ const StaffSchema = new Schema<IStaff>({
     'Pack & Load': { type: Boolean, default: false },
   },
   leave: [{
-    start: { type: String, required: true },
-    end: { type: String, required: true },
+    date: { type: String, required: true }, // Single date in YYYY-MM-DD format
+    leaveType: { type: String, required: true, default: 'Annual' }, // Type of leave
+    notes: { type: String }, // Optional notes
   }],
 }, {
   timestamps: true,

@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import { 
   Box, 
   Card, 
@@ -16,7 +20,27 @@ import {
   Divider,
   Grid,
   IconButton,
-  Avatar
+  Avatar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  Snackbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
 } from '@mui/material';
 import { 
   ArrowBack as ArrowBackIcon, 
@@ -27,13 +51,22 @@ import {
   Schedule as ScheduleIcon,
   Star as StarIcon,
   Build as BuildIcon,
-  Event as EventIcon
+  Event as EventIcon,
+  Add as AddIcon,
+  Remove as RemoveIcon
 } from '@mui/icons-material';
 
 export default function EmployeeView() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const employeeId = params.id as string;
+  
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [newLeaveDate, setNewLeaveDate] = useState<Dayjs | null>(dayjs());
+  const [newLeaveType, setNewLeaveType] = useState('Annual');
+  const [newLeaveNotes, setNewLeaveNotes] = useState('');
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as any });
 
   const { data: employee, isLoading, error } = useQuery({
     queryKey: ['employee', employeeId],
@@ -43,6 +76,47 @@ export default function EmployeeView() {
       return response.json();
     },
     enabled: !!employeeId
+  });
+
+  // Leave management mutations
+  const addLeaveMutation = useMutation({
+    mutationFn: async (leaveData: any) => {
+      const response = await fetch(`/api/staff/${employeeId}/leave`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(leaveData),
+      });
+      if (!response.ok) throw new Error('Failed to add leave');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employee', employeeId] });
+      setSnackbar({ open: true, message: 'Leave added successfully', severity: 'success' });
+      setLeaveDialogOpen(false);
+      setNewLeaveDate(dayjs());
+      setNewLeaveType('Annual');
+      setNewLeaveNotes('');
+    },
+    onError: (error: any) => {
+      setSnackbar({ open: true, message: 'Failed to add leave', severity: 'error' });
+    },
+  });
+
+  const removeLeaveMutation = useMutation({
+    mutationFn: async (leaveDate: string) => {
+      const response = await fetch(`/api/staff/${employeeId}/leave/${encodeURIComponent(leaveDate)}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to remove leave');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employee', employeeId] });
+      setSnackbar({ open: true, message: 'Leave removed successfully', severity: 'success' });
+    },
+    onError: (error: any) => {
+      setSnackbar({ open: true, message: 'Failed to remove leave', severity: 'error' });
+    },
   });
 
   if (isLoading) {
@@ -64,7 +138,9 @@ export default function EmployeeView() {
   }
 
   const handleEdit = () => {
-    router.push(`/employees/edit/${employeeId}`);
+    // For now, just go back to employees list
+    // TODO: Implement edit functionality
+    router.push('/employees');
   };
 
   const handleBack = () => {
@@ -73,23 +149,43 @@ export default function EmployeeView() {
 
   const getSkillLevel = (skill: string) => {
     if (!employee.skills || !employee.skills[skill]) return 'Not Available';
-    const level = employee.skills[skill];
-    if (level >= 0.9) return 'Expert';
-    if (level >= 0.7) return 'Advanced';
-    if (level >= 0.5) return 'Intermediate';
-    if (level >= 0.3) return 'Beginner';
-    return 'Novice';
+    return 'Available';
   };
 
   const getSkillColor = (skill: string) => {
     if (!employee.skills || !employee.skills[skill]) return 'default';
-    const level = employee.skills[skill];
-    if (level >= 0.9) return 'success';
-    if (level >= 0.7) return 'primary';
-    if (level >= 0.5) return 'warning';
-    if (level >= 0.3) return 'info';
-    return 'default';
+    return 'success';
   };
+
+  const handleAddLeave = () => {
+    if (!newLeaveDate) return;
+    
+    // Validate date is not in the past
+    if (newLeaveDate.isBefore(dayjs(), 'day')) {
+      setSnackbar({ 
+        open: true, 
+        message: 'Cannot add leave dates in the past', 
+        severity: 'warning' 
+      });
+      return;
+    }
+    
+    const leaveData = {
+      date: newLeaveDate.format('YYYY-MM-DD'),
+      leaveType: newLeaveType,
+      notes: newLeaveNotes
+    };
+
+    addLeaveMutation.mutate(leaveData);
+  };
+
+  const handleRemoveLeave = (leaveDate: string) => {
+    if (window.confirm('Are you sure you want to remove this leave date?')) {
+      removeLeaveMutation.mutate(leaveDate);
+    }
+  };
+
+  const leaveTypes = ["Annual", "Sick", "Personal", "Holiday", "Other"];
 
   return (
     <Box sx={{ p: 3 }}>
@@ -103,39 +199,218 @@ export default function EmployeeView() {
             Employee Details
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button
-            variant="outlined"
-            startIcon={<EditIcon />}
-            onClick={handleEdit}
-            sx={{
-              borderColor: '#667eea',
-              color: '#667eea',
-              '&:hover': {
-                borderColor: '#5a6fd8',
-                backgroundColor: 'rgba(102, 126, 234, 0.08)'
-              }
-            }}
-          >
-            Edit Employee
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<WorkIcon />}
-            sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-              }
-            }}
-          >
-            View Schedule
-          </Button>
-        </Box>
-      </Box>
+                 <Box sx={{ display: 'flex', gap: 2 }}>
+           <Button
+             variant="outlined"
+             startIcon={<EventIcon />}
+             onClick={() => setLeaveDialogOpen(true)}
+             sx={{
+               borderColor: '#667eea',
+               color: '#667eea',
+               '&:hover': {
+                 borderColor: '#5a6fd8',
+                 backgroundColor: 'rgba(102, 126, 234, 0.08)'
+               }
+             }}
+           >
+             Manage Leave
+           </Button>
+         </Box>
+             </Box>
 
-      {/* Employee Overview Card */}
+       {/* Leave Management Table */}
+       <Card sx={{ mb: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: 3 }}>
+         <CardContent sx={{ p: 3 }}>
+           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+             <Typography variant="h6" sx={{ fontWeight: 600, color: '#2c3e50' }}>
+               Leave Management
+             </Typography>
+             <Button
+               variant="contained"
+               startIcon={<AddIcon />}
+               onClick={() => setLeaveDialogOpen(true)}
+               sx={{
+                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                 color: 'white',
+                 '&:hover': {
+                   background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
+                 }
+               }}
+             >
+               Add Leave
+             </Button>
+           </Box>
+           
+                       {employee?.leave && employee.leave.length > 0 ? (
+              <TableContainer component={Paper} sx={{ maxHeight: 400, overflow: 'auto' }}>
+                <Table stickyHeader size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600, backgroundColor: '#f8f9fa' }}>Date</TableCell>
+                      <TableCell sx={{ fontWeight: 600, backgroundColor: '#f8f9fa' }}>Leave Type</TableCell>
+                      <TableCell sx={{ fontWeight: 600, backgroundColor: '#f8f9fa' }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 600, backgroundColor: '#f8f9fa' }}>Notes</TableCell>
+                      <TableCell sx={{ fontWeight: 600, backgroundColor: '#f8f9fa', width: 80 }}>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {employee.leave
+                      .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                      .map((leaveItem: any, index: number) => {
+                        const leaveDate = dayjs(leaveItem.date);
+                        const isPast = leaveDate.isBefore(dayjs(), 'day');
+                        const isToday = leaveDate.isSame(dayjs(), 'day');
+                        
+                        return (
+                          <TableRow 
+                            key={index}
+                            sx={{ 
+                              backgroundColor: isPast ? '#fafafa' : 'inherit',
+                              '&:hover': { backgroundColor: isPast ? '#f5f5f5' : '#f8f9fa' }
+                            }}
+                          >
+                            <TableCell>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  fontWeight: 500,
+                                  color: isPast ? '#9e9e9e' : '#2c3e50'
+                                }}
+                              >
+                                {leaveDate.format('DD/MM/YYYY')}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#7f8c8d' }}>
+                                {leaveDate.isBefore(dayjs(), 'day') ? 'Past' : leaveDate.isSame(dayjs(), 'day') ? 'Today' : leaveDate.diff(dayjs(), 'day') + ' days from now'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={leaveItem.leaveType} 
+                                size="small" 
+                                color={isPast ? "default" : isToday ? "warning" : "primary"}
+                                variant="outlined"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              {isPast && (
+                                <Chip 
+                                  label="Past" 
+                                  size="small" 
+                                  color="default" 
+                                  variant="outlined"
+                                  sx={{ fontSize: '0.7rem' }}
+                                />
+                              )}
+                              {isToday && (
+                                <Chip 
+                                  label="Today" 
+                                  size="small" 
+                                  color="warning" 
+                                  variant="outlined"
+                                  sx={{ fontSize: '0.7rem' }}
+                                />
+                              )}
+                              {!isPast && !isToday && (
+                                <Chip 
+                                  label="Upcoming" 
+                                  size="small" 
+                                  color="info" 
+                                  variant="outlined"
+                                  sx={{ fontSize: '0.7rem' }}
+                                />
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  color: '#7f8c8d',
+                                  maxWidth: 200,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}
+                                title={leaveItem.notes || 'No notes'}
+                              >
+                                {leaveItem.notes || 'No notes'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <IconButton 
+                                onClick={() => handleRemoveLeave(leaveItem.date)}
+                                color="error"
+                                size="small"
+                                disabled={isPast}
+                                title={isPast ? "Cannot remove past leave dates" : "Remove leave date"}
+                                sx={{ 
+                                  backgroundColor: 'rgba(255,255,255,0.8)',
+                                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.9)' }
+                                }}
+                              >
+                                <RemoveIcon />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                                     </TableBody>
+                 </Table>
+                 
+                 {/* Summary Row */}
+                 <Box sx={{ 
+                   p: 2, 
+                   backgroundColor: '#f8f9fa', 
+                   borderTop: '1px solid #e0e0e0',
+                   display: 'flex',
+                   justifyContent: 'space-between',
+                   alignItems: 'center'
+                 }}>
+                   <Box sx={{ display: 'flex', gap: 3 }}>
+                     <Typography variant="body2" sx={{ color: '#7f8c8d' }}>
+                       <strong>Total Leave Days:</strong> {employee.leave.length}
+                     </Typography>
+                     <Typography variant="body2" sx={{ color: '#7f8c8d' }}>
+                       <strong>Past:</strong> {employee.leave.filter((l: any) => dayjs(l.date).isBefore(dayjs(), 'day')).length}
+                     </Typography>
+                     <Typography variant="body2" sx={{ color: '#7f8c8d' }}>
+                       <strong>Upcoming:</strong> {employee.leave.filter((l: any) => dayjs(l.date).isAfter(dayjs(), 'day')).length}
+                     </Typography>
+                   </Box>
+                   <Typography variant="caption" sx={{ color: '#7f8c8d' }}>
+                     Hover over notes to see full text
+                   </Typography>
+                 </Box>
+               </TableContainer>
+           ) : (
+             <Box sx={{ textAlign: 'center', py: 4 }}>
+               <EventIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+               <Typography variant="h6" sx={{ color: 'text.secondary', mb: 1 }}>
+                 No Leave Days Scheduled
+               </Typography>
+               <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+                 This employee has no leave days scheduled. Click "Add Leave" to manage their availability.
+               </Typography>
+               <Button
+                 variant="outlined"
+                 startIcon={<AddIcon />}
+                 onClick={() => setLeaveDialogOpen(true)}
+                 sx={{
+                   borderColor: '#667eea',
+                   color: '#667eea',
+                   '&:hover': {
+                     borderColor: '#5a6fd8',
+                     backgroundColor: 'rgba(102, 126, 234, 0.08)'
+                   }
+                 }}
+               >
+                 Add First Leave Day
+               </Button>
+             </Box>
+           )}
+         </CardContent>
+       </Card>
+
+       {/* Employee Overview Card */}
       <Card sx={{ mb: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: 3 }}>
         <CardContent sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3 }}>
@@ -273,7 +548,7 @@ export default function EmployeeView() {
                       sx={{ mb: 1 }}
                     />
                     <Typography variant="body2" sx={{ color: '#7f8c8d' }}>
-                      {((level as number) * 100).toFixed(0)}% proficiency
+                      Available
                     </Typography>
                   </Paper>
                 </Grid>
@@ -283,39 +558,7 @@ export default function EmployeeView() {
         </Card>
       )}
 
-      {/* Leave Information */}
-      {employee.leave && employee.leave.length > 0 && (
-        <Card sx={{ mb: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: 3 }}>
-          <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ mb: 3, color: '#2c3e50', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <EventIcon color="primary" />
-              Leave Schedule
-            </Typography>
-            <Grid container spacing={2}>
-              {employee.leave.map((leaveItem: any, index: number) => (
-                <Grid item xs={12} sm={6} md={4} key={index}>
-                  <Paper sx={{ 
-                    p: 2, 
-                    borderRadius: 2, 
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid rgba(0,0,0,0.1)'
-                  }}>
-                    <Typography variant="body2" sx={{ color: '#7f8c8d', mb: 1 }}>
-                      {leaveItem.type || 'Leave'}
-                    </Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 500, mb: 0.5 }}>
-                      {new Date(leaveItem.start).toLocaleDateString()} - {new Date(leaveItem.end).toLocaleDateString()}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#7f8c8d' }}>
-                      {Math.ceil((new Date(leaveItem.end).getTime() - new Date(leaveItem.start).getTime()) / (1000 * 60 * 60 * 24))} days
-                    </Typography>
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
-          </CardContent>
-        </Card>
-      )}
+      
 
       {/* Future Sections Placeholder */}
       <Card sx={{ boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: 3 }}>
@@ -335,6 +578,203 @@ export default function EmployeeView() {
           </Box>
         </CardContent>
       </Card>
+
+      {/* Leave Management Dialog */}
+      <Dialog open={leaveDialogOpen} onClose={() => setLeaveDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">
+              Manage Leave - {employee?.name || 'Employee'}
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'grid', gap: 3, pt: 1 }}>
+            {/* Current Leave List */}
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2 }}>Current Leave Days</Typography>
+              {employee?.leave && employee.leave.length > 0 ? (
+                <List sx={{ bgcolor: '#f8f9fa', borderRadius: 1, maxHeight: 200, overflow: 'auto' }}>
+                  {employee.leave
+                    .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                    .map((leaveItem: any, index: number) => {
+                      const leaveDate = dayjs(leaveItem.date);
+                      const isPast = leaveDate.isBefore(dayjs(), 'day');
+                      const isToday = leaveDate.isSame(dayjs(), 'day');
+                      
+                      return (
+                        <ListItem key={index} divider>
+                          <ListItemText
+                            primary={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Chip 
+                                  label={leaveItem.leaveType} 
+                                  size="small" 
+                                  color={isPast ? "default" : isToday ? "warning" : "primary"}
+                                  variant="outlined"
+                                />
+                                <Typography 
+                                  variant="body1" 
+                                  sx={{ 
+                                    fontWeight: 500,
+                                    color: isPast ? 'text.secondary' : 'text.primary'
+                                  }}
+                                >
+                                  {leaveDate.format('DD/MM/YYYY')}
+                                </Typography>
+                                {isPast && (
+                                  <Chip 
+                                    label="Past" 
+                                    size="small" 
+                                    color="default" 
+                                    variant="outlined"
+                                    sx={{ fontSize: '0.7rem' }}
+                                  />
+                                )}
+                                {isToday && (
+                                  <Chip 
+                                    label="Today" 
+                                    size="small" 
+                                    color="warning" 
+                                    variant="outlined"
+                                    sx={{ fontSize: '0.7rem' }}
+                                  />
+                                )}
+                              </Box>
+                            }
+                            secondary={
+                              <Box sx={{ mt: 0.5 }}>
+                                {leaveItem.notes && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    {leaveItem.notes}
+                                  </Typography>
+                                )}
+                                <Typography variant="caption" color="text.secondary">
+                                  {leaveDate.isBefore(dayjs(), 'day') ? 'Past' : leaveDate.isSame(dayjs(), 'day') ? 'Today' : leaveDate.diff(dayjs(), 'day') + ' days from now'}
+                                </Typography>
+                              </Box>
+                            }
+                          />
+                          <ListItemSecondaryAction>
+                            <IconButton 
+                              edge="end" 
+                              onClick={() => handleRemoveLeave(leaveItem.date)}
+                              color="error"
+                              size="small"
+                              disabled={isPast}
+                              title={isPast ? "Cannot remove past leave dates" : "Remove leave date"}
+                            >
+                              <RemoveIcon />
+                            </IconButton>
+                          </ListItemSecondaryAction>
+                        </ListItem>
+                      );
+                    })}
+                </List>
+              ) : (
+                <Box sx={{ textAlign: 'center', py: 3 }}>
+                  <EventIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+                  <Typography variant="body2" color="text.secondary">
+                    No leave days scheduled
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Add leave dates below to manage availability
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+
+            <Divider />
+
+            {/* Add New Leave */}
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2 }}>Add New Leave Day</Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4}>
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DatePicker
+                      label="Leave Date"
+                      value={newLeaveDate}
+                      onChange={(date) => setNewLeaveDate(date)}
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          size: "small",
+                          helperText: "Select a future date"
+                        }
+                      }}
+                    />
+                  </LocalizationProvider>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Leave Type</InputLabel>
+                    <Select
+                      value={newLeaveType}
+                      onChange={(e) => setNewLeaveType(e.target.value)}
+                      label="Leave Type"
+                    >
+                      {leaveTypes.map(type => (
+                        <MenuItem key={type} value={type}>{type}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="Notes (Optional)"
+                    value={newLeaveNotes}
+                    onChange={(e) => setNewLeaveNotes(e.target.value)}
+                    fullWidth
+                    size="small"
+                    placeholder="e.g., Annual leave, Personal day"
+                  />
+                </Grid>
+              </Grid>
+              <Box sx={{ mt: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+                <Button
+                  variant="contained"
+                  onClick={handleAddLeave}
+                  disabled={!newLeaveDate}
+                  sx={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
+                    }
+                  }}
+                >
+                  Add Leave Day
+                </Button>
+                <Typography variant="caption" color="text.secondary">
+                  {newLeaveDate && newLeaveDate.isAfter(dayjs(), 'day') 
+                    ? `Adding leave for ${newLeaveDate.format('DD/MM/YYYY')}`
+                    : 'Select a future date to add leave'
+                  }
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLeaveDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
