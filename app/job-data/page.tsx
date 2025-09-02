@@ -9,7 +9,8 @@ import {
   GridRowSelectionModel,
   GridToolbar,
   GridActionsCellItem,
-  GridRowId
+  GridRowId,
+  GridRowParams
 } from '@mui/x-data-grid';
 import { 
   Box, 
@@ -23,15 +24,17 @@ import {
   InputLabel,
   CircularProgress, 
   Alert,
-  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   Button,
-  Snackbar
+  Snackbar,
+  Chip,
+  FormHelperText
 } from '@mui/material';
-import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
+import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, Visibility as VisibilityIcon, Upload as UploadIcon, Archive as ArchiveIcon } from '@mui/icons-material';
+import dayjs from 'dayjs';
 
 export default function JobData() {
   const queryClient = useQueryClient();
@@ -43,8 +46,9 @@ export default function JobData() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<any>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as any });
-  
-
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   const { data: projectsData, isLoading: projectsLoading, error: projectsError } = useQuery({
     queryKey: ['projects'],
@@ -63,6 +67,37 @@ export default function JobData() {
       return response.json();
     }
   });
+
+  // Separate active and archived projects
+  const { activeProjects, archivedProjects } = useMemo(() => {
+    if (!projectsData) return { activeProjects: [], archivedProjects: [] };
+    
+    const now = new Date();
+    const active: any[] = [];
+    const archived: any[] = [];
+    
+    projectsData.forEach((project: any) => {
+      if (project.truckDate && new Date(project.truckDate) < now) {
+        archived.push(project);
+      } else {
+        active.push(project);
+      }
+    });
+    
+    return { activeProjects: active, archivedProjects: archived };
+  }, [projectsData]);
+
+  // Use active or archived projects based on toggle
+  const currentProjects = showArchived ? archivedProjects : activeProjects;
+
+  // Check if project has enough data for capacity planning
+  const hasEnoughData = (project: any) => {
+    return project.truckDate && 
+           project.weeksBefore !== undefined && 
+           project.weeksBefore > 0 &&
+           project.hoursBySkill && 
+           Object.values(project.hoursBySkill).some((hours: any) => hours > 0);
+  };
 
   // Mutations
   const updateProjectMutation = useMutation({
@@ -126,17 +161,54 @@ export default function JobData() {
     },
   });
 
+  const csvImportMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/import-excel', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) throw new Error('Failed to import CSV');
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      
+      // Show detailed import results
+      let message = 'CSV processed successfully';
+      if (data.created > 0 || data.updated > 0) {
+        message = `CSV processed: ${data.created} created, ${data.updated} updated`;
+      }
+      
+      setSnackbar({ 
+        open: true, 
+        message: message, 
+        severity: 'success' 
+      });
+      setCsvImportOpen(false);
+      setCsvFile(null);
+    },
+    onError: (error: any) => {
+      setSnackbar({ open: true, message: 'Failed to import CSV', severity: 'error' });
+    },
+  });
+
   const projectTypes = useMemo(() => {
     return curveLibraryData?.curves?.map((curve: any) => curve.name) || [];
   }, [curveLibraryData]);
 
   const skills = ["CNC", "Build", "Paint", "AV", "Pack & Load"];
 
+  // Probability options for dropdown (0% to 100% in 10% increments)
+  const probabilityOptions = Array.from({ length: 11 }, (_, i) => i * 10);
+
   const handleEdit = useCallback((id: GridRowId) => {
-    const project = projectsData?.find((p: any) => p._id === id);
+    const project = currentProjects?.find((p: any) => p._id === id);
     setEditingProject(project);
     setEditDialogOpen(true);
-  }, [projectsData]);
+  }, [currentProjects]);
 
   const handleDelete = useCallback((id: GridRowId) => {
     if (window.confirm('Are you sure you want to delete this project?')) {
@@ -147,10 +219,10 @@ export default function JobData() {
   const handleAddNew = () => {
     setEditingProject({
       name: '',
-      truckDate: null,
-      weeksBefore: 0,
+      truckDate: dayjs().format('YYYY-MM-DD'),
+      weeksBefore: 4,
       hoursBySkill: { CNC: 0, Build: 0, Paint: 0, AV: 0, "Pack & Load": 0 },
-      probability: null,
+      probability: 0.9,
       onsite: { hours: 0, weeks: 0 },
       projectType: null,
       curveMode: 'Mathematician'
@@ -159,7 +231,6 @@ export default function JobData() {
   };
 
   const handleSave = () => {
-    // Ensure truckDate is properly formatted and remove _id for new projects
     const projectToSave = {
       ...editingProject,
       truckDate: editingProject.truckDate || null
@@ -168,13 +239,18 @@ export default function JobData() {
     if (editingProject._id) {
       updateProjectMutation.mutate(projectToSave);
     } else {
-      // Remove _id for new projects
       const { _id, ...newProject } = projectToSave;
       createProjectMutation.mutate(newProject);
     }
   };
 
-  // Generate columns
+  const handleCsvImport = () => {
+    if (csvFile) {
+      csvImportMutation.mutate(csvFile);
+    }
+  };
+
+  // Generate columns with better editing
   const columns: GridColDef[] = [
     {
       field: "name",
@@ -185,11 +261,11 @@ export default function JobData() {
         <Box
           sx={{
             cursor: 'pointer',
-            color: '#667eea',
-            fontWeight: 500,
+            color: hasEnoughData(params.row) ? '#667eea' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400,
             '&:hover': {
               textDecoration: 'underline',
-              color: '#5a6fd8'
+              color: hasEnoughData(params.row) ? '#5a6fd8' : '#6b7280'
             }
           }}
           onClick={() => {
@@ -207,6 +283,14 @@ export default function JobData() {
       editable: true,
       type: "singleSelect",
       valueOptions: projectTypes,
+      renderCell: (params) => (
+        <Chip 
+          label={params.value || 'None'} 
+          size="small" 
+          variant="outlined"
+          color={params.value ? 'primary' : 'default'}
+        />
+      ),
     },
     {
       field: "curveMode",
@@ -215,19 +299,40 @@ export default function JobData() {
       editable: true,
       type: "singleSelect",
       valueOptions: ["Mathematician", "Linear", "Triangular"],
+      renderCell: (params) => (
+        <Chip 
+          label={params.value || 'Mathematician'} 
+          size="small" 
+          variant="outlined"
+          color="secondary"
+        />
+      ),
     },
     {
       field: "truckDate",
-      headerName: "Truck Date",
+      headerName: "Truck Date ⬇",
       width: 140,
       editable: true,
       type: "date",
+      sortable: true,
       valueGetter: (params: GridValueGetterParams) => {
-        return params.value ? new Date(params.value) : null;
+        // Return Date object for MUI DataGrid date column type
+        return params.row.truckDate ? new Date(params.row.truckDate) : null;
       },
       valueSetter: (params) => {
-        return { ...params.row, truckDate: params.value ? params.value.toISOString().split('T')[0] : null };
+        return { ...params.row, truckDate: params.value ? new Date(params.value).toISOString().split('T')[0] : null };
       },
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.row.truckDate ? dayjs(params.row.truckDate).format('DD/MM/YYYY') : 'Not set'}
+        </Typography>
+      ),
     },
     {
       field: "weeksBefore",
@@ -235,13 +340,25 @@ export default function JobData() {
       width: 120,
       editable: true,
       type: "number",
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.value || 0}
+        </Typography>
+      ),
     },
     {
       field: "probability",
       headerName: "Probability",
       width: 120,
       editable: true,
-      type: "number",
+      type: "singleSelect",
+      valueOptions: probabilityOptions.map(p => ({ value: p / 100, label: `${p}%` })),
       valueGetter: (params: GridValueGetterParams) => {
         return params.value ? params.value * 100 : 0;
       },
@@ -249,10 +366,18 @@ export default function JobData() {
         return { ...params.row, probability: (params.value || 0) / 100 };
       },
       renderCell: (params) => {
-        return params.value ? `${params.value.toFixed(0)}%` : '';
+        const value = params.value || 0;
+        return (
+          <Chip 
+            label={`${value.toFixed(0)}%`} 
+            size="small" 
+            color={value >= 80 ? 'success' : value >= 60 ? 'warning' : 'error'}
+            variant="outlined"
+          />
+        );
       },
     },
-    // Skill columns
+    // Skill columns with better validation
     {
       field: "hoursBySkill.CNC",
       headerName: "CNC (h)",
@@ -263,9 +388,20 @@ export default function JobData() {
         return params.row.hoursBySkill?.CNC || 0;
       },
       valueSetter: (params) => {
-        const newHoursBySkill = { ...params.row.hoursBySkill, CNC: params.value || 0 };
+        const newHoursBySkill = { ...params.row.hoursBySkill, CNC: Math.max(0, params.value || 0) };
         return { ...params.row, hoursBySkill: newHoursBySkill };
       },
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.value || 0}
+        </Typography>
+      ),
     },
     {
       field: "hoursBySkill.Build",
@@ -277,9 +413,20 @@ export default function JobData() {
         return params.row.hoursBySkill?.Build || 0;
       },
       valueSetter: (params) => {
-        const newHoursBySkill = { ...params.row.hoursBySkill, Build: params.value || 0 };
+        const newHoursBySkill = { ...params.row.hoursBySkill, Build: Math.max(0, params.value || 0) };
         return { ...params.row, hoursBySkill: newHoursBySkill };
       },
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.value || 0}
+        </Typography>
+      ),
     },
     {
       field: "hoursBySkill.Paint",
@@ -291,9 +438,20 @@ export default function JobData() {
         return params.row.hoursBySkill?.Paint || 0;
       },
       valueSetter: (params) => {
-        const newHoursBySkill = { ...params.row.hoursBySkill, Paint: params.value || 0 };
+        const newHoursBySkill = { ...params.row.hoursBySkill, Paint: Math.max(0, params.value || 0) };
         return { ...params.row, hoursBySkill: newHoursBySkill };
       },
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.value || 0}
+        </Typography>
+      ),
     },
     {
       field: "hoursBySkill.AV",
@@ -305,9 +463,20 @@ export default function JobData() {
         return params.row.hoursBySkill?.AV || 0;
       },
       valueSetter: (params) => {
-        const newHoursBySkill = { ...params.row.hoursBySkill, AV: params.value || 0 };
+        const newHoursBySkill = { ...params.row.hoursBySkill, AV: Math.max(0, params.value || 0) };
         return { ...params.row, hoursBySkill: newHoursBySkill };
       },
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.value || 0}
+        </Typography>
+      ),
     },
     {
       field: "hoursBySkill.Pack & Load",
@@ -319,9 +488,20 @@ export default function JobData() {
         return params.row.hoursBySkill?.["Pack & Load"] || 0;
       },
       valueSetter: (params) => {
-        const newHoursBySkill = { ...params.row.hoursBySkill, "Pack & Load": params.value || 0 };
+        const newHoursBySkill = { ...params.row.hoursBySkill, "Pack & Load": Math.max(0, params.value || 0) };
         return { ...params.row, hoursBySkill: newHoursBySkill };
       },
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.value || 0}
+        </Typography>
+      ),
     },
     {
       field: "onsite.hours",
@@ -333,9 +513,20 @@ export default function JobData() {
         return params.row.onsite?.hours || 0;
       },
       valueSetter: (params) => {
-        const newOnsite = { ...params.row.onsite, hours: params.value || 0 };
+        const newOnsite = { ...params.row.onsite, hours: Math.max(0, params.value || 0) };
         return { ...params.row, onsite: newOnsite };
       },
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.value || 0}
+        </Typography>
+      ),
     },
     {
       field: "onsite.weeks",
@@ -347,9 +538,20 @@ export default function JobData() {
         return params.row.onsite?.weeks || 0;
       },
       valueSetter: (params) => {
-        const newOnsite = { ...params.row.onsite, weeks: params.value || 0 };
+        const newOnsite = { ...params.row.onsite, weeks: Math.max(0, params.value || 0) };
         return { ...params.row, onsite: newOnsite };
       },
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.value || 0}
+        </Typography>
+      ),
     },
     {
       field: 'actions',
@@ -381,7 +583,6 @@ export default function JobData() {
   // Process row update
   const processRowUpdate = useCallback(
     (newRow: any, oldRow: any) => {
-      // Ensure truckDate is properly formatted for the API
       const updatedRow = {
         ...newRow,
         truckDate: newRow.truckDate instanceof Date 
@@ -395,12 +596,22 @@ export default function JobData() {
     [updateProjectMutation]
   );
 
-  // Transform data for DataGrid
-  const rows = projectsData?.map((project: any) => ({
-    ...project,
-    hoursBySkill: project.hoursBySkill || {},
-    onsite: project.onsite || { hours: 0, weeks: 0 },
-  })) || [];
+  // Transform data for DataGrid with default sorting
+  const rows = useMemo(() => {
+    const transformed = currentProjects?.map((project: any) => ({
+      ...project,
+      hoursBySkill: project.hoursBySkill || {},
+      onsite: project.onsite || { hours: 0, weeks: 0 },
+    })) || [];
+    
+    // Sort by truck date (most recent first)
+    return transformed.sort((a: any, b: any) => {
+      if (!a.truckDate && !b.truckDate) return 0;
+      if (!a.truckDate) return 1;
+      if (!b.truckDate) return -1;
+      return new Date(b.truckDate).getTime() - new Date(a.truckDate).getTime();
+    });
+  }, [currentProjects]);
 
   if (projectsLoading || curveLibraryLoading) {
     return (
@@ -431,23 +642,97 @@ export default function JobData() {
             <Typography variant="h5" sx={{ fontWeight: 600 }}>
               Project Management
             </Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleAddNew}
-              sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                }
-              }}
-            >
-              Add New Project
-            </Button>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button
+                variant="outlined"
+                startIcon={<UploadIcon />}
+                onClick={() => setCsvImportOpen(true)}
+                sx={{
+                  borderColor: '#667eea',
+                  color: '#667eea',
+                  '&:hover': {
+                    borderColor: '#5a6fd8',
+                    backgroundColor: 'rgba(102, 126, 234, 0.08)'
+                  }
+                }}
+              >
+                Import CSV
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<ArchiveIcon />}
+                onClick={() => setShowArchived(!showArchived)}
+                sx={{
+                  borderColor: showArchived ? '#dc3545' : '#667eea',
+                  color: showArchived ? '#dc3545' : '#667eea',
+                  '&:hover': {
+                    borderColor: showArchived ? '#c82333' : '#5a6fd8',
+                    backgroundColor: showArchived ? 'rgba(220, 53, 69, 0.08)' : 'rgba(102, 126, 234, 0.08)'
+                  }
+                }}
+              >
+                {showArchived ? 'Show Active' : 'Show Archived'}
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleAddNew}
+                sx={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
+                  }
+                }}
+              >
+                Add New Project
+              </Button>
+            </Box>
           </Box>
           
-          <Box sx={{ height: "calc(100vh - 300px)", width: "100%" }}>
+          {/* Status Summary */}
+          <Box sx={{ mb: 3, p: 2, backgroundColor: '#f8f9fa', borderRadius: 2, border: '1px solid #e9ecef' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" sx={{ color: '#495057', fontWeight: 600 }}>
+                Project Status Summary
+              </Typography>
+              <Chip 
+                label="Sorted by Truck Date (Latest First)" 
+                size="small" 
+                color="primary" 
+                variant="outlined"
+                sx={{ fontSize: '0.75rem' }}
+              />
+            </Box>
+            <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="h4" sx={{ color: '#28a745', fontWeight: 700 }}>
+                  {activeProjects.filter(hasEnoughData).length}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#6c757d' }}>
+                  Active Projects (Complete Data)
+                </Typography>
+              </Box>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="h4" sx={{ color: '#ffc107', fontWeight: 700 }}>
+                  {activeProjects.filter(p => !hasEnoughData(p)).length}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#6c757d' }}>
+                  Active Projects (Incomplete Data)
+                </Typography>
+              </Box>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="h4" sx={{ color: '#6c757d', fontWeight: 700 }}>
+                  {archivedProjects.length}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#6c757d' }}>
+                  Archived Projects
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+          
+          <Box sx={{ height: "calc(100vh - 400px)", width: "100%" }}>
             <DataGrid
               rows={rows}
               columns={columns}
@@ -474,6 +759,19 @@ export default function JobData() {
                   quickFilterProps: { debounceMs: 500 },
                 },
               }}
+              getRowClassName={(params: GridRowParams) => {
+                return hasEnoughData(params.row) ? '' : 'incomplete-project';
+              }}
+              initialState={{
+                sorting: {
+                  sortModel: [
+                    {
+                      field: 'truckDate',
+                      sort: 'desc'
+                    }
+                  ]
+                }
+              }}
               sx={{
                 border: "none",
                 "& .MuiDataGrid-cell": {
@@ -499,6 +797,16 @@ export default function JobData() {
                   borderBottom: "1px solid #e2e8f0",
                   padding: "8px 16px",
                 },
+                "& .incomplete-project": {
+                  backgroundColor: "#f8f9fa",
+                  color: "#6c757d",
+                  "&:hover": {
+                    backgroundColor: "#e9ecef",
+                  },
+                },
+                "& .incomplete-project .MuiDataGrid-cell": {
+                  color: "#6c757d",
+                },
               }}
             />
           </Box>
@@ -518,6 +826,8 @@ export default function JobData() {
                 value={editingProject.name || ''}
                 onChange={(e) => setEditingProject({ ...editingProject, name: e.target.value })}
                 fullWidth
+                required
+                helperText="Project name is required"
               />
               <FormControl fullWidth>
                 <InputLabel>Project Type</InputLabel>
@@ -539,10 +849,13 @@ export default function JobData() {
                   onChange={(e) => setEditingProject({ ...editingProject, curveMode: e.target.value })}
                   label="Curve Mode"
                 >
-                  <MenuItem value="Mathematician">Mathematician</MenuItem>
-                  <MenuItem value="Linear">Linear</MenuItem>
-                  <MenuItem value="Triangular">Triangular</MenuItem>
+                  <MenuItem value="Mathematician">Mathematician (Bell Curve)</MenuItem>
+                  <MenuItem value="Linear">Linear (Even Distribution)</MenuItem>
+                  <MenuItem value="Triangular">Triangular (Peak in Middle)</MenuItem>
                 </Select>
+                <FormHelperText>
+                  Mathematician: Bell curve distribution, Linear: Even distribution, Triangular: Peak in middle
+                </FormHelperText>
               </FormControl>
               <TextField
                 label="Truck Date"
@@ -550,18 +863,9 @@ export default function JobData() {
                 value={editingProject.truckDate || ''}
                 onChange={(e) => setEditingProject({ ...editingProject, truckDate: e.target.value })}
                 fullWidth
+                required
                 InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#e2e8f0',
-                  },
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#cbd5e1',
-                  },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#667eea',
-                  },
-                }}
+                helperText="Date when project is delivered to site"
               />
               <TextField
                 label="Lead Weeks"
@@ -569,14 +873,25 @@ export default function JobData() {
                 value={editingProject.weeksBefore || 0}
                 onChange={(e) => setEditingProject({ ...editingProject, weeksBefore: Number(e.target.value) })}
                 fullWidth
+                required
+                inputProps={{ min: 0, step: 1 }}
+                helperText="Number of weeks before truck date to start work"
               />
-              <TextField
-                label="Probability (%)"
-                type="number"
-                value={editingProject.probability ? editingProject.probability * 100 : ''}
-                onChange={(e) => setEditingProject({ ...editingProject, probability: Number(e.target.value) / 100 })}
-                fullWidth
-              />
+              <FormControl fullWidth>
+                <InputLabel>Probability</InputLabel>
+                <Select
+                  value={editingProject.probability ? editingProject.probability * 100 : 90}
+                  onChange={(e) => setEditingProject({ ...editingProject, probability: Number(e.target.value) / 100 })}
+                  label="Probability"
+                >
+                  {probabilityOptions.map((p) => (
+                    <MenuItem key={p} value={p}>{p}%</MenuItem>
+                  ))}
+                </Select>
+                <FormHelperText>
+                  Probability of project proceeding (0-100%)
+                </FormHelperText>
+              </FormControl>
               
               <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Hours by Skill</Typography>
               {skills.map(skill => (
@@ -593,6 +908,8 @@ export default function JobData() {
                     }
                   })}
                   fullWidth
+                  inputProps={{ min: 0, step: 0.5 }}
+                  helperText={`Total hours required for ${skill} work`}
                 />
               ))}
               
@@ -606,6 +923,8 @@ export default function JobData() {
                     ...editingProject,
                     onsite: { ...editingProject.onsite, hours: Number(e.target.value) }
                   })}
+                  inputProps={{ min: 0, step: 0.5 }}
+                  helperText="Total hours for onsite work"
                 />
                 <TextField
                   label="Onsite Weeks"
@@ -615,6 +934,8 @@ export default function JobData() {
                     ...editingProject,
                     onsite: { ...editingProject.onsite, weeks: Number(e.target.value) }
                   })}
+                  inputProps={{ min: 0, step: 1 }}
+                  helperText="Number of weeks for onsite work"
                 />
               </Box>
             </Box>
@@ -638,7 +959,43 @@ export default function JobData() {
         </DialogActions>
       </Dialog>
 
-
+      {/* CSV Import Dialog */}
+      <Dialog open={csvImportOpen} onClose={() => setCsvImportOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Import Projects from CSV</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'grid', gap: 2, pt: 1 }}>
+            <Typography variant="body2" sx={{ color: '#6c757d', mb: 2 }}>
+              Upload a CSV file with project data. The file should include columns for:
+              Project Name, Truck Date, Lead Weeks, Probability, and hours for each skill.
+            </Typography>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={(e) => setCsvFile((e.target as HTMLInputElement).files?.[0] || null)}
+              style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+            />
+            <FormHelperText>
+              Supported format: CSV with headers matching the project fields
+            </FormHelperText>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCsvImportOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleCsvImport} 
+            variant="contained"
+            disabled={!csvFile || csvImportMutation.isPending}
+            sx={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
+              }
+            }}
+          >
+            {csvImportMutation.isPending ? <><CircularProgress size={18} sx={{ mr: 1, color: 'white' }} /> Importing...</> : 'Import CSV'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar */}
       <Snackbar

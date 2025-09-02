@@ -11,6 +11,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceLine,
 } from "recharts";
 import {
   Box,
@@ -82,36 +83,29 @@ function isPastInstall(p: any, todayISO: string) {
 
 function computeTimelineWeeks(
   projects: any[],
+  startDate: Date,
+  endDate: Date,
   padAfterWeeks = 2,
   minWeeks = 16
 ) {
-  const valid = projects.filter(
-    (p) => p.truckDate && (p.weeksBefore || 0) >= 0
-  );
-  if (!valid.length) {
-    const start = startOfWeekMonday(new Date());
-    return Array.from({ length: minWeeks }, (_, i) =>
-      toISO(addDays(start, i * 7))
-    );
-  }
-  let minStart: Date | null = null,
-    maxEnd: Date | null = null;
-  for (const p of valid) {
-    const truck = startOfWeekMonday(parseISODate(p.truckDate!));
-    const start = addDays(truck, -7 * (p.weeksBefore || 0));
-    const end = addDays(truck, 7 * padAfterWeeks + 7 * (p.onsite?.weeks || 0));
-    if (!minStart || start < minStart) minStart = start;
-    if (!maxEnd || end > maxEnd) maxEnd = end;
-  }
+  // Use the selected date range instead of calculating from project data
+  const start = startOfWeekMonday(startDate);
+  const end = startOfWeekMonday(endDate);
+  
   const weeks: string[] = [];
-  const s = startOfWeekMonday(minStart!);
-  for (let d = new Date(s); d <= maxEnd!; d = addDays(d, 7))
+  for (let d = new Date(start); d <= end; d = addDays(d, 7)) {
     weeks.push(toISO(d));
+  }
+  
+  // Ensure minimum weeks if the range is too short
   if (weeks.length < minWeeks) {
     const need = minWeeks - weeks.length;
     const last = parseISODate(weeks[weeks.length - 1]);
-    for (let i = 1; i <= need; i++) weeks.push(toISO(addDays(last, i * 7)));
+    for (let i = 1; i <= need; i++) {
+      weeks.push(toISO(addDays(last, i * 7)));
+    }
   }
+  
   return weeks;
 }
 
@@ -141,13 +135,45 @@ function computeWeeklyDemand(
     for (const sk of skills) {
       const hours = p.hoursBySkill?.[sk] || 0;
       if (N > 0 && hours > 0) {
-        // Simple linear distribution for now
-        const hoursPerWeek = hours / N;
-        for (let k = 1; k <= N; k++) {
-          const week = toISO(addDays(truckWeek, -7 * k));
+        // Apply different curve profiles based on curveMode
+        const curveMode = p.curveMode || 'Mathematician';
+        let weeklyDistribution: number[] = [];
+        
+        switch (curveMode) {
+          case 'Linear':
+            // Even distribution across weeks
+            weeklyDistribution = Array(N).fill(hours / N);
+            break;
+            
+          case 'Triangular':
+            // Peak in the middle, tapering at ends
+            weeklyDistribution = [];
+            for (let i = 0; i < N; i++) {
+              const progress = i / (N - 1);
+              const triangular = 2 * (1 - Math.abs(2 * progress - 1));
+              weeklyDistribution.push((hours * triangular) / N);
+            }
+            break;
+            
+          case 'Mathematician':
+          default:
+            // Bell curve distribution (normal distribution approximation)
+            weeklyDistribution = [];
+            for (let i = 0; i < N; i++) {
+              const progress = i / (N - 1);
+              const bell = Math.exp(-Math.pow((progress - 0.5) / 0.2, 2));
+              weeklyDistribution.push((hours * bell) / N);
+            }
+            break;
+        }
+        
+        // Apply the distribution
+        for (let k = 0; k < N; k++) {
+          const week = toISO(addDays(truckWeek, -7 * (k + 1)));
           if (!(week in total)) continue;
-          perSkill[sk][week] += hoursPerWeek;
-          total[week] += hoursPerWeek;
+          const weekHours = weeklyDistribution[k] || 0;
+          perSkill[sk][week] += weekHours;
+          total[week] += weekHours;
         }
       }
     }
@@ -213,6 +239,15 @@ export default function Dashboard() {
   const [includeOnsite, setIncludeOnsite] = useState(true);
   const [startDate, setStartDate] = useState<Dayjs>(dayjs());
   const [endDate, setEndDate] = useState<Dayjs>(dayjs().add(12, "month"));
+  
+  // Skill visibility state
+  const [skillVisibility, setSkillVisibility] = useState({
+    CNC: true,
+    Build: true,
+    Paint: true,
+    AV: true,
+    "Pack & Load": true,
+  });
 
   // View dialogs state
   const [viewProjectsOpen, setViewProjectsOpen] = useState(false);
@@ -263,28 +298,28 @@ export default function Dashboard() {
   // Preset active state
   const isNextActive = useMemo(
     () =>
-      startDate.isSame(dayjs().startOf("day"), "day") &&
+      startDate.isSame(dayjs().subtract(1, "week").startOf("day"), "day") &&
       endDate.isSame(dayjs().add(12, "month").endOf("day"), "day"),
     [startDate, endDate]
   );
   const isPrevActive = useMemo(
     () =>
       startDate.isSame(dayjs().subtract(12, "month").startOf("day"), "day") &&
-      endDate.isSame(dayjs().endOf("day"), "day"),
+      endDate.isSame(dayjs().startOf("day"), "day"),
     [startDate, endDate]
   );
 
   const filtered = useMemo(
     () =>
       visible.filter((p: any) =>
-        p.probability == null ? true : p.probability >= probability
+        p.probability == null ? true : p.probability >= probability / 100
       ),
     [visible, probability]
   );
 
   const weeks = useMemo(
-    () => computeTimelineWeeks(filtered, 2, 20),
-    [filtered]
+    () => computeTimelineWeeks(filtered, startDate.toDate(), endDate.toDate(), 2, 20),
+    [filtered, startDate, endDate]
   );
   const capacity = useMemo(
     () => computeWeeklyCapacity(staff, weeks),
@@ -295,14 +330,16 @@ export default function Dashboard() {
     [filtered, weeks, includeOnsite]
   );
 
-  const fmt = new Intl.DateTimeFormat("en-AU", {
+  const fmt = new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
+    year: "numeric",
   });
   const chartData = useMemo(
     () =>
       weeks.map((wk) => ({
         weekLabel: fmt.format(parseISODate(wk)),
+        weekISO: wk,
         demand: Number((demand.total[wk] || 0).toFixed(1)),
         capacity: Number((capacity.unique[wk] || 0).toFixed(1)),
         util:
@@ -311,9 +348,24 @@ export default function Dashboard() {
                 ((demand.total[wk] / capacity.unique[wk]) * 100).toFixed(1)
               )
             : 0,
+        // Skill-specific demand data
+        cncDemand: Number((demand.perSkill.CNC[wk] || 0).toFixed(1)),
+        buildDemand: Number((demand.perSkill.Build[wk] || 0).toFixed(1)),
+        paintDemand: Number((demand.perSkill.Paint[wk] || 0).toFixed(1)),
+        avDemand: Number((demand.perSkill.AV[wk] || 0).toFixed(1)),
+        packLoadDemand: Number((demand.perSkill["Pack & Load"][wk] || 0).toFixed(1)),
+
       })),
-    [weeks, demand, capacity]
+    [weeks, demand, capacity, fmt]
   );
+
+  // Find current week index for vertical line
+  const currentWeekIndex = useMemo(() => {
+    const today = new Date();
+    const todayWeekStart = startOfWeekMonday(today);
+    const todayWeekISO = toISO(todayWeekStart);
+    return chartData.findIndex(data => data.weekISO === todayWeekISO);
+  }, [chartData]);
 
   const pressure = useMemo(
     () =>
@@ -399,14 +451,14 @@ export default function Dashboard() {
                   textAlign: "center"
                 }}
               >
-                Probability ≥ {probability.toFixed(1)}
+                Probability ≥ {probability}%
               </Typography>
               <Slider
                 value={probability}
                 onChange={(_, value) => setProbability(value as number)}
                 min={0}
-                max={1}
-                step={0.1}
+                max={100}
+                step={10}
                 marks
                 valueLabelDisplay="auto"
                 sx={{
@@ -472,6 +524,72 @@ export default function Dashboard() {
               />
             </Box>
 
+            {/* Skill Visibility Checkboxes */}
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                alignItems: "center",
+                minHeight: 60,
+                borderLeft: "1px solid rgba(255,255,255,0.2)",
+                pl: 2,
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  opacity: 0.9,
+                  fontWeight: 500,
+                  fontSize: "0.875rem",
+                  textAlign: "center",
+                  mb: 0.5,
+                }}
+              >
+                Skill Lines
+              </Typography>
+              <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", justifyContent: "center" }}>
+                {Object.entries(skillVisibility).map(([skill, visible]) => (
+                  <FormControlLabel
+                    key={skill}
+                    control={
+                      <Checkbox
+                        checked={visible}
+                        onChange={(e) => setSkillVisibility(prev => ({
+                          ...prev,
+                          [skill]: e.target.checked
+                        }))}
+                        size="small"
+                        sx={{
+                          color: "rgba(255,255,255,0.8)",
+                          "&.Mui-checked": {
+                            color: "white",
+                          },
+                          "& .MuiSvgIcon-root": {
+                            fontSize: 16,
+                          },
+                        }}
+                      />
+                    }
+                    label={
+                      <Typography
+                        variant="caption"
+                        sx={{ 
+                          color: "white", 
+                          fontWeight: 500, 
+                          fontSize: "0.7rem",
+                          lineHeight: 1
+                        }}
+                      >
+                        {skill === "Pack & Load" ? "P&L" : skill}
+                      </Typography>
+                    }
+                    sx={{ margin: 0, minWidth: "auto" }}
+                  />
+                ))}
+              </Box>
+            </Box>
+
             {/* Date Preset Buttons */}
             <Box 
               sx={{ 
@@ -499,7 +617,7 @@ export default function Dashboard() {
                   variant="outlined"
                   size="small"
                   onClick={() => {
-                    setStartDate(dayjs().startOf("day"));
+                    setStartDate(dayjs().subtract(1, "week").startOf("day"));
                     setEndDate(dayjs().add(12, "month").endOf("day"));
                   }}
                   sx={{
@@ -532,7 +650,7 @@ export default function Dashboard() {
                   size="small"
                   onClick={() => {
                     setStartDate(dayjs().subtract(12, "month").startOf("day"));
-                    setEndDate(dayjs().endOf("day"));
+                    setEndDate(dayjs().startOf("day"));
                   }}
                   sx={{
                     color: "white",
@@ -767,7 +885,7 @@ export default function Dashboard() {
                 <Line
                   type="monotone"
                   dataKey="demand"
-                  name="Demand (h)"
+                  name="Total Demand (h)"
                   strokeWidth={3}
                   stroke="#ff6b6b"
                   dot={false}
@@ -776,12 +894,88 @@ export default function Dashboard() {
                 <Line
                   type="monotone"
                   dataKey="capacity"
-                  name="Capacity (h)"
+                  name="Total Capacity (h)"
                   strokeWidth={3}
                   stroke="#4ecdc4"
                   dot={false}
                   activeDot={{ r: 6, stroke: "#4ecdc4", strokeWidth: 2 }}
                 />
+                
+                {/* Individual Skill Demand Lines */}
+                {skillVisibility.CNC && (
+                  <Line
+                    type="monotone"
+                    dataKey="cncDemand"
+                    name="CNC"
+                    strokeWidth={1}
+                    stroke="#ff9ff3"
+                    dot={false}
+                    activeDot={{ r: 2, stroke: "#ff9ff3", strokeWidth: 1 }}
+                  />
+                )}
+                {skillVisibility.Build && (
+                  <Line
+                    type="monotone"
+                    dataKey="buildDemand"
+                    name="Build"
+                    strokeWidth={1}
+                    stroke="#54a0ff"
+                    dot={false}
+                    activeDot={{ r: 2, stroke: "#54a0ff", strokeWidth: 1 }}
+                  />
+                )}
+                {skillVisibility.Paint && (
+                  <Line
+                    type="monotone"
+                    dataKey="paintDemand"
+                    name="Paint"
+                    strokeWidth={1}
+                    stroke="#ff9f43"
+                    dot={false}
+                    activeDot={{ r: 2, stroke: "#ff9f43", strokeWidth: 1 }}
+                  />
+                )}
+                {skillVisibility.AV && (
+                  <Line
+                    type="monotone"
+                    dataKey="avDemand"
+                    name="AV"
+                    strokeWidth={1}
+                    stroke="#5f27cd"
+                    dot={false}
+                    activeDot={{ r: 2, stroke: "#5f27cd", strokeWidth: 1 }}
+                  />
+                )}
+                {skillVisibility["Pack & Load"] && (
+                  <Line
+                    type="monotone"
+                    dataKey="packLoadDemand"
+                    name="P&L"
+                    strokeWidth={1}
+                    stroke="#00d2d3"
+                    dot={false}
+                    activeDot={{ r: 2, stroke: "#00d2d3", strokeWidth: 1 }}
+                  />
+                )}
+                
+
+                
+                {/* Current date vertical line */}
+                {currentWeekIndex >= 0 && (
+                  <ReferenceLine
+                    x={currentWeekIndex}
+                    stroke="#ffd700"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    label={{
+                      value: "Today",
+                      position: "top",
+                      fill: "#ffd700",
+                      fontSize: 12,
+                      fontWeight: "bold",
+                    }}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </Box>

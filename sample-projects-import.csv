@@ -1,0 +1,11 @@
+Project Name,Truck Date,Lead Weeks,Probability,CNC Hours,Build Hours,Paint Hours,AV Hours,Pack & Load Hours,Onsite Hours,Onsite Weeks,Project Type,Curve Mode
+Magic Millions 2026,2026-03-15,8,90,120,200,80,40,20,60,3,Exhibition,Mathematician
+Brisbane Show 2025,2025-08-20,6,85,80,150,60,30,15,45,2,Show,Linear
+Gold Coast Event,2025-11-10,4,95,60,100,40,20,10,30,1,Event,Triangular
+Sydney Exhibition,2026-01-25,10,75,200,300,120,60,30,90,4,Exhibition,Mathematician
+Melbourne Show,2025-09-15,5,80,100,180,70,35,18,50,2,Show,Linear
+Perth Event,2026-02-28,7,70,140,220,90,45,22,70,3,Event,Mathematician
+Adelaide Festival,2025-12-05,6,90,90,160,65,32,16,48,2,Festival,Triangular
+Canberra Show,2026-04-10,8,85,160,240,100,50,25,75,3,Show,Mathematician
+Darwin Event,2025-10-20,5,80,70,130,55,28,14,42,2,Event,Linear
+Hobart Festival,2026-05-15,6,75,110,170,75,38,19,55,2,Festival,Triangular
