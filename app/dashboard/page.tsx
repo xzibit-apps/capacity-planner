@@ -727,6 +727,7 @@ export default function Dashboard() {
                     <DatePicker
                       value={startDate}
                       onChange={(v) => v && setStartDate(v)}
+                      format="DD/MM/YYYY"
                       slotProps={{
                         textField: {
                           size: "small",
@@ -761,6 +762,7 @@ export default function Dashboard() {
                     <DatePicker
                       value={endDate}
                       onChange={(v) => v && setEndDate(v)}
+                      format="DD/MM/YYYY"
                       slotProps={{
                         textField: {
                           size: "small",
