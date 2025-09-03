@@ -130,23 +130,25 @@ export interface UpdateJobTypeRequest {
 // Project types
 export interface Project {
   _id: string;
-  name: string;
-  truckDate?: string;
-  weeksBefore: number;
-  hoursBySkill: {
-    CNC: number;
-    Build: number;
-    Paint: number;
-    AV: number;
-    'Pack & Load': number;
-  };
-  probability?: number;
-  onsite?: {
-    hours: number;
-    weeks: number;
-  };
-  projectType?: string;
+  jobNumber: string;
+  jobName: string;
   jobType?: string; // Reference to JobType _id
+  truckLoadDate?: string;
+  weeksToBuild: number;
+  status?: string;
+  probability?: number;
+  // Individual skill columns from the sheet
+  cnc: number;
+  build: number;
+  paint: number;
+  av: number;
+  packAndLoad: number;
+  tradeOnsite: number;
+  onsiteWeeks: number;
+  installDeadline?: string;
+  hrsEstOnly?: boolean;
+  pm?: string;
+  notes?: string;
   curveMode?: 'Mathematician' | 'Linear' | 'Triangular';
   createdAt: Date;
   updatedAt: Date;

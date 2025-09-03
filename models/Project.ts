@@ -1,63 +1,103 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IProject extends Document {
-  name: string;
-  truckDate: string | null;
-  weeksBefore: number;
-  hoursBySkill: {
-    CNC: number;
-    Build: number;
-    Paint: number;
-    AV: number;
-    'Pack & Load': number;
-  };
-  probability?: number | null;
-  onsite?: {
-    hours: number;
-    weeks: number;
-  };
-  projectType?: string | null;
-  jobType?: mongoose.Types.ObjectId;
+  jobNumber: string; // Column 0: Job#
+  jobName: string; // Column 1: Job Name
+  jobType?: mongoose.Types.ObjectId; // Column 2: MUST FILL Job Type
+  truckLoadDate: string | null; // Column 3: MUST FILL Truck Load Date
+  weeksToBuild: number; // Column 4: Weeks to Build in Wkshop
+  status?: string | null; // Column 5: Status
+  probability?: number | null; // Column 6: Probability
+  // Individual skill columns from the sheet
+  cnc: number; // Column 7: CNC
+  build: number; // Column 8: Build
+  paint: number; // Column 9: Paint
+  av: number; // Column 10: AV
+  packAndLoad: number; // Column 11: Pack & Load
+  tradeOnsite: number; // Column 12: Trade Onsite
+  onsiteWeeks: number; // Column 13: Onsite Weeks (WHOLE NUMBERS)
+  installDeadline?: string | null; // Column 14: Install Deadline
+  hrsEstOnly?: boolean; // Column 15: Hrs est. only?
+  pm?: string | null; // Column 16: PM
+  notes?: string | null; // Column 17: Notes
   curveMode?: 'Mathematician' | 'Linear' | 'Triangular';
   createdAt: Date;
   updatedAt: Date;
 }
 
 const ProjectSchema = new Schema<IProject>({
-  name: {
+  jobNumber: {
     type: String,
     required: true,
   },
-  truckDate: {
+  jobName: {
+    type: String,
+    required: true,
+  },
+  jobType: {
+    type: Schema.Types.ObjectId,
+    ref: 'JobType',
+    default: null,
+  },
+  truckLoadDate: {
     type: String,
     default: null,
   },
-  weeksBefore: {
+  weeksToBuild: {
     type: Number,
     default: 0,
   },
-  hoursBySkill: {
-    CNC: { type: Number, default: 0 },
-    Build: { type: Number, default: 0 },
-    Paint: { type: Number, default: 0 },
-    AV: { type: Number, default: 0 },
-    'Pack & Load': { type: Number, default: 0 },
+  status: {
+    type: String,
+    default: null,
   },
   probability: {
     type: Number,
     default: null,
   },
-  onsite: {
-    hours: { type: Number, default: 0 },
-    weeks: { type: Number, default: 0 },
+  // Individual skill columns from the sheet
+  cnc: {
+    type: Number,
+    default: 0,
   },
-  projectType: {
+  build: {
+    type: Number,
+    default: 0,
+  },
+  paint: {
+    type: Number,
+    default: 0,
+  },
+  av: {
+    type: Number,
+    default: 0,
+  },
+  packAndLoad: {
+    type: Number,
+    default: 0,
+  },
+  tradeOnsite: {
+    type: Number,
+    default: 0,
+  },
+  onsiteWeeks: {
+    type: Number,
+    default: 0,
+  },
+  installDeadline: {
     type: String,
     default: null,
   },
-  jobType: {
-    type: Schema.Types.ObjectId,
-    ref: 'JobType',
+  hrsEstOnly: {
+    type: Boolean,
+    default: false,
+  },
+  pm: {
+    type: String,
+    default: null,
+  },
+  notes: {
+    type: String,
     default: null,
   },
   curveMode: {

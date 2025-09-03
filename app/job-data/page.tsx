@@ -49,6 +49,7 @@ export default function JobData() {
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const { data: projectsData, isLoading: projectsLoading, error: projectsError } = useQuery({
     queryKey: ['projects'],
@@ -77,7 +78,7 @@ export default function JobData() {
     const archived: any[] = [];
     
     projectsData.forEach((project: any) => {
-      if (project.truckDate && new Date(project.truckDate) < now) {
+      if (project.truckLoadDate && new Date(project.truckLoadDate) < now) {
         archived.push(project);
       } else {
         active.push(project);
@@ -92,11 +93,10 @@ export default function JobData() {
 
   // Check if project has enough data for capacity planning
   const hasEnoughData = (project: any) => {
-    return project.truckDate && 
-           project.weeksBefore !== undefined && 
-           project.weeksBefore > 0 &&
-           project.hoursBySkill && 
-           Object.values(project.hoursBySkill).some((hours: any) => hours > 0);
+    return project.truckLoadDate && 
+           project.weeksToBuild !== undefined && 
+           project.weeksToBuild > 0 &&
+           (project.build > 0 || project.cnc > 0 || project.paint > 0 || project.av > 0 || project.packAndLoad > 0);
   };
 
   // Mutations
@@ -195,6 +195,44 @@ export default function JobData() {
     },
   });
 
+  const syncFromSheetsMutation = useMutation({
+    mutationFn: async () => {
+      setIsSyncing(true);
+      const response = await fetch('/api/google-sheets/import', {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error('Failed to sync from Google Sheets');
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['jobTypes'] }); // Also refresh job types
+      setIsSyncing(false);
+      
+      let message = 'Data synced successfully from Google Sheets';
+      if (data.created > 0 || data.updated > 0) {
+        message = `Synced from Sheets: ${data.created} project(s) created, ${data.updated} project(s) updated`;
+        if (data.errors && data.errors.length > 0) {
+          message += ` (${data.errors.length} errors)`;
+        }
+      }
+      
+      setSnackbar({ 
+        open: true, 
+        message: message, 
+        severity: 'success' 
+      });
+    },
+    onError: (error: any) => {
+      setIsSyncing(false);
+      setSnackbar({ 
+        open: true, 
+        message: 'Failed to sync from Google Sheets', 
+        severity: 'error' 
+      });
+    },
+  });
+
   const projectTypes = useMemo(() => {
     return curveLibraryData?.curves?.map((curve: any) => curve.name) || [];
   }, [curveLibraryData]);
@@ -218,13 +256,19 @@ export default function JobData() {
 
   const handleAddNew = () => {
     setEditingProject({
-      name: '',
-      truckDate: dayjs().format('YYYY-MM-DD'),
-      weeksBefore: 4,
-      hoursBySkill: { CNC: 0, Build: 0, Paint: 0, AV: 0, "Pack & Load": 0 },
+      jobNumber: '',
+      jobName: '',
+      truckLoadDate: dayjs().format('YYYY-MM-DD'),
+      weeksToBuild: 4,
+      cnc: 0,
+      build: 0,
+      paint: 0,
+      av: 0,
+      packAndLoad: 0,
+      tradeOnsite: 0,
+      onsiteWeeks: 0,
       probability: 0.9,
-      onsite: { hours: 0, weeks: 0 },
-      projectType: null,
+      status: null,
       curveMode: 'Mathematician'
     });
     setEditDialogOpen(true);
@@ -233,7 +277,7 @@ export default function JobData() {
   const handleSave = () => {
     const projectToSave = {
       ...editingProject,
-      truckDate: editingProject.truckDate || null
+      truckLoadDate: editingProject.truckLoadDate || null
     };
     
     if (editingProject._id) {
@@ -253,8 +297,25 @@ export default function JobData() {
   // Generate columns with better editing
   const columns: GridColDef[] = [
     {
-      field: "name",
-      headerName: "Project Name",
+      field: "jobNumber",
+      headerName: "Job#",
+      width: 100,
+      editable: true,
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.value || 'No Job#'}
+        </Typography>
+      ),
+    },
+    {
+      field: "jobName",
+      headerName: "Job Name",
       width: 250,
       editable: true,
       renderCell: (params) => (
@@ -277,12 +338,12 @@ export default function JobData() {
       ),
     },
     {
-      field: "projectType",
-      headerName: "Project Type",
+      field: "status",
+      headerName: "Status",
       width: 200,
       editable: true,
       type: "singleSelect",
-      valueOptions: projectTypes,
+      valueOptions: ["confirmed", "completed", "TBQ", "quote sent", "Quote in progress", "production quote", "won", "Not progressing", "approved"],
       renderCell: (params) => (
         <Chip 
           label={params.value || 'None'} 
@@ -309,18 +370,18 @@ export default function JobData() {
       ),
     },
     {
-      field: "truckDate",
-      headerName: "Truck Date ⬇",
-      width: 140,
+      field: "truckLoadDate",
+      headerName: "MUST FILL Truck Load Date",
+      width: 180,
       editable: true,
       type: "date",
       sortable: true,
       valueGetter: (params: GridValueGetterParams) => {
         // Return Date object for MUI DataGrid date column type
-        return params.row.truckDate ? new Date(params.row.truckDate) : null;
+        return params.row.truckLoadDate ? new Date(params.row.truckLoadDate) : null;
       },
       valueSetter: (params) => {
-        return { ...params.row, truckDate: params.value ? new Date(params.value).toISOString().split('T')[0] : null };
+        return { ...params.row, truckLoadDate: params.value ? new Date(params.value).toISOString().split('T')[0] : null };
       },
       renderCell: (params) => (
         <Typography 
@@ -330,14 +391,14 @@ export default function JobData() {
             fontWeight: hasEnoughData(params.row) ? 500 : 400
           }}
         >
-          {params.row.truckDate ? dayjs(params.row.truckDate).format('DD/MM/YYYY') : 'Not set'}
+          {params.row.truckLoadDate ? dayjs(params.row.truckLoadDate).format('DD/MM/YYYY') : 'Not set'}
         </Typography>
       ),
     },
     {
-      field: "weeksBefore",
-      headerName: "Lead (wks)",
-      width: 120,
+      field: "weeksToBuild",
+      headerName: "Weeks to Build in Wkshop",
+      width: 180,
       editable: true,
       type: "number",
       renderCell: (params) => (
@@ -377,20 +438,85 @@ export default function JobData() {
         );
       },
     },
-    // Skill columns with better validation
+    // Individual skill columns
     {
-      field: "hoursBySkill.CNC",
-      headerName: "CNC (h)",
+      field: "cnc",
+      headerName: "CNC",
+      width: 80,
+      editable: true,
+      type: "number",
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.value || 0}
+        </Typography>
+      ),
+    },
+    {
+      field: "build",
+      headerName: "Build",
+      width: 80,
+      editable: true,
+      type: "number",
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.value || 0}
+        </Typography>
+      ),
+    },
+    {
+      field: "paint",
+      headerName: "Paint",
+      width: 80,
+      editable: true,
+      type: "number",
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.value || 0}
+        </Typography>
+      ),
+    },
+    {
+      field: "av",
+      headerName: "AV",
+      width: 80,
+      editable: true,
+      type: "number",
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.value || 0}
+        </Typography>
+      ),
+    },
+    {
+      field: "packAndLoad",
+      headerName: "Pack & Load",
       width: 100,
       editable: true,
       type: "number",
-      valueGetter: (params: GridValueGetterParams) => {
-        return params.row.hoursBySkill?.CNC || 0;
-      },
-      valueSetter: (params) => {
-        const newHoursBySkill = { ...params.row.hoursBySkill, CNC: Math.max(0, params.value || 0) };
-        return { ...params.row, hoursBySkill: newHoursBySkill };
-      },
       renderCell: (params) => (
         <Typography 
           variant="body2" 
@@ -404,118 +530,11 @@ export default function JobData() {
       ),
     },
     {
-      field: "hoursBySkill.Build",
-      headerName: "Build (h)",
-      width: 100,
-      editable: true,
-      type: "number",
-      valueGetter: (params: GridValueGetterParams) => {
-        return params.row.hoursBySkill?.Build || 0;
-      },
-      valueSetter: (params) => {
-        const newHoursBySkill = { ...params.row.hoursBySkill, Build: Math.max(0, params.value || 0) };
-        return { ...params.row, hoursBySkill: newHoursBySkill };
-      },
-      renderCell: (params) => (
-        <Typography 
-          variant="body2" 
-          sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
-            fontWeight: hasEnoughData(params.row) ? 500 : 400
-          }}
-        >
-          {params.value || 0}
-        </Typography>
-      ),
-    },
-    {
-      field: "hoursBySkill.Paint",
-      headerName: "Paint (h)",
-      width: 100,
-      editable: true,
-      type: "number",
-      valueGetter: (params: GridValueGetterParams) => {
-        return params.row.hoursBySkill?.Paint || 0;
-      },
-      valueSetter: (params) => {
-        const newHoursBySkill = { ...params.row.hoursBySkill, Paint: Math.max(0, params.value || 0) };
-        return { ...params.row, hoursBySkill: newHoursBySkill };
-      },
-      renderCell: (params) => (
-        <Typography 
-          variant="body2" 
-          sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
-            fontWeight: hasEnoughData(params.row) ? 500 : 400
-          }}
-        >
-          {params.value || 0}
-        </Typography>
-      ),
-    },
-    {
-      field: "hoursBySkill.AV",
-      headerName: "AV (h)",
-      width: 100,
-      editable: true,
-      type: "number",
-      valueGetter: (params: GridValueGetterParams) => {
-        return params.row.hoursBySkill?.AV || 0;
-      },
-      valueSetter: (params) => {
-        const newHoursBySkill = { ...params.row.hoursBySkill, AV: Math.max(0, params.value || 0) };
-        return { ...params.row, hoursBySkill: newHoursBySkill };
-      },
-      renderCell: (params) => (
-        <Typography 
-          variant="body2" 
-          sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
-            fontWeight: hasEnoughData(params.row) ? 500 : 400
-          }}
-        >
-          {params.value || 0}
-        </Typography>
-      ),
-    },
-    {
-      field: "hoursBySkill.Pack & Load",
-      headerName: "Pack & Load (h)",
-      width: 140,
-      editable: true,
-      type: "number",
-      valueGetter: (params: GridValueGetterParams) => {
-        return params.row.hoursBySkill?.["Pack & Load"] || 0;
-      },
-      valueSetter: (params) => {
-        const newHoursBySkill = { ...params.row.hoursBySkill, "Pack & Load": Math.max(0, params.value || 0) };
-        return { ...params.row, hoursBySkill: newHoursBySkill };
-      },
-      renderCell: (params) => (
-        <Typography 
-          variant="body2" 
-          sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
-            fontWeight: hasEnoughData(params.row) ? 500 : 400
-          }}
-        >
-          {params.value || 0}
-        </Typography>
-      ),
-    },
-    {
-      field: "onsite.hours",
-      headerName: "Onsite (h)",
+      field: "tradeOnsite",
+      headerName: "Trade Onsite",
       width: 120,
       editable: true,
       type: "number",
-      valueGetter: (params: GridValueGetterParams) => {
-        return params.row.onsite?.hours || 0;
-      },
-      valueSetter: (params) => {
-        const newOnsite = { ...params.row.onsite, hours: Math.max(0, params.value || 0) };
-        return { ...params.row, onsite: newOnsite };
-      },
       renderCell: (params) => (
         <Typography 
           variant="body2" 
@@ -529,18 +548,11 @@ export default function JobData() {
       ),
     },
     {
-      field: "onsite.weeks",
-      headerName: "Onsite (wks)",
-      width: 130,
+      field: "onsiteWeeks",
+      headerName: "Onsite Weeks (WHOLE NUMBERS)",
+      width: 180,
       editable: true,
       type: "number",
-      valueGetter: (params: GridValueGetterParams) => {
-        return params.row.onsite?.weeks || 0;
-      },
-      valueSetter: (params) => {
-        const newOnsite = { ...params.row.onsite, weeks: Math.max(0, params.value || 0) };
-        return { ...params.row, onsite: newOnsite };
-      },
       renderCell: (params) => (
         <Typography 
           variant="body2" 
@@ -553,6 +565,87 @@ export default function JobData() {
         </Typography>
       ),
     },
+    {
+      field: "installDeadline",
+      headerName: "Install Deadline",
+      width: 150,
+      editable: true,
+      type: "date",
+      valueGetter: (params: GridValueGetterParams) => {
+        return params.row.installDeadline ? new Date(params.row.installDeadline) : null;
+      },
+      valueSetter: (params) => {
+        return { ...params.row, installDeadline: params.value ? new Date(params.value).toISOString().split('T')[0] : null };
+      },
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.row.installDeadline ? dayjs(params.row.installDeadline).format('DD/MM/YYYY') : 'Not set'}
+        </Typography>
+      ),
+    },
+    {
+      field: "hrsEstOnly",
+      headerName: "Hrs est. only?",
+      width: 120,
+      editable: true,
+      type: "boolean",
+      renderCell: (params) => (
+        <Chip 
+          label={params.value ? 'Yes' : 'No'} 
+          size="small" 
+          variant="outlined"
+          color={params.value ? 'warning' : 'default'}
+        />
+      ),
+    },
+    {
+      field: "pm",
+      headerName: "PM",
+      width: 100,
+      editable: true,
+      type: "string",
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400
+          }}
+        >
+          {params.value || 'No PM'}
+        </Typography>
+      ),
+    },
+    {
+      field: "notes",
+      headerName: "Notes",
+      width: 300,
+      editable: true,
+      type: "string",
+      renderCell: (params) => (
+        <Typography 
+          variant="body2" 
+          sx={{ 
+            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            fontWeight: hasEnoughData(params.row) ? 500 : 400,
+            maxWidth: '280px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}
+          title={params.value || ''}
+        >
+          {params.value || 'No notes'}
+        </Typography>
+      ),
+    },
+
     {
       field: 'actions',
       type: 'actions',
@@ -585,9 +678,9 @@ export default function JobData() {
     (newRow: any, oldRow: any) => {
       const updatedRow = {
         ...newRow,
-        truckDate: newRow.truckDate instanceof Date 
-          ? newRow.truckDate.toISOString().split('T')[0] 
-          : newRow.truckDate
+        truckLoadDate: newRow.truckLoadDate instanceof Date 
+          ? newRow.truckLoadDate.toISOString().split('T')[0] 
+          : newRow.truckLoadDate
       };
       
       updateProjectMutation.mutate(updatedRow);
@@ -600,16 +693,14 @@ export default function JobData() {
   const rows = useMemo(() => {
     const transformed = currentProjects?.map((project: any) => ({
       ...project,
-      hoursBySkill: project.hoursBySkill || {},
-      onsite: project.onsite || { hours: 0, weeks: 0 },
     })) || [];
     
-    // Sort by truck date (most recent first)
+    // Sort by truck load date (most recent first)
     return transformed.sort((a: any, b: any) => {
-      if (!a.truckDate && !b.truckDate) return 0;
-      if (!a.truckDate) return 1;
-      if (!b.truckDate) return -1;
-      return new Date(b.truckDate).getTime() - new Date(a.truckDate).getTime();
+      if (!a.truckLoadDate && !b.truckLoadDate) return 0;
+      if (!a.truckLoadDate) return 1;
+      if (!b.truckLoadDate) return -1;
+      return new Date(b.truckLoadDate).getTime() - new Date(a.truckLoadDate).getTime();
     });
   }, [currentProjects]);
 
@@ -643,6 +734,26 @@ export default function JobData() {
               Project Management
             </Typography>
             <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button
+                variant="outlined"
+                startIcon={isSyncing ? <CircularProgress size={18} /> : <UploadIcon />}
+                onClick={() => syncFromSheetsMutation.mutate()}
+                disabled={isSyncing}
+                sx={{
+                  borderColor: '#28a745',
+                  color: '#28a745',
+                  '&:hover': {
+                    borderColor: '#218838',
+                    backgroundColor: 'rgba(40, 167, 69, 0.08)'
+                  },
+                  '&:disabled': {
+                    borderColor: '#6c757d',
+                    color: '#6c757d'
+                  }
+                }}
+              >
+                {isSyncing ? 'Syncing...' : 'Sync from Sheets'}
+              </Button>
               <Button
                 variant="outlined"
                 startIcon={<UploadIcon />}
@@ -696,13 +807,13 @@ export default function JobData() {
               <Typography variant="h6" sx={{ color: '#495057', fontWeight: 600 }}>
                 Project Status Summary
               </Typography>
-              <Chip 
-                label="Sorted by Truck Date (Latest First)" 
-                size="small" 
-                color="primary" 
-                variant="outlined"
-                sx={{ fontSize: '0.75rem' }}
-              />
+                             <Chip 
+                 label="Sorted by Truck Load Date (Latest First)" 
+                 size="small" 
+                 color="primary" 
+                 variant="outlined"
+                 sx={{ fontSize: '0.75rem' }}
+               />
             </Box>
             <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Box sx={{ textAlign: 'center' }}>
@@ -762,16 +873,16 @@ export default function JobData() {
               getRowClassName={(params: GridRowParams) => {
                 return hasEnoughData(params.row) ? '' : 'incomplete-project';
               }}
-              initialState={{
-                sorting: {
-                  sortModel: [
-                    {
-                      field: 'truckDate',
-                      sort: 'desc'
-                    }
-                  ]
-                }
-              }}
+                             initialState={{
+                 sorting: {
+                   sortModel: [
+                     {
+                       field: 'truckLoadDate',
+                       sort: 'desc'
+                     }
+                   ]
+                 }
+               }}
               sx={{
                 border: "none",
                 "& .MuiDataGrid-cell": {
@@ -821,27 +932,41 @@ export default function JobData() {
         <DialogContent>
           {editingProject && (
             <Box sx={{ display: 'grid', gap: 2, pt: 1 }}>
-              <TextField
-                label="Project Name"
-                value={editingProject.name || ''}
-                onChange={(e) => setEditingProject({ ...editingProject, name: e.target.value })}
-                fullWidth
-                required
-                helperText="Project name is required"
-              />
-              <FormControl fullWidth>
-                <InputLabel>Project Type</InputLabel>
-                <Select
-                  value={editingProject.projectType || ''}
-                  onChange={(e) => setEditingProject({ ...editingProject, projectType: e.target.value })}
-                  label="Project Type"
-                >
-                  <MenuItem value="">(none)</MenuItem>
-                  {projectTypes.map((type: string) => (
-                    <MenuItem key={type} value={type}>{type}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                             <TextField
+                 label="Job Number"
+                 value={editingProject.jobNumber || ''}
+                 onChange={(e) => setEditingProject({ ...editingProject, jobNumber: e.target.value })}
+                 fullWidth
+                 required
+                 helperText="Job number is required"
+               />
+               <TextField
+                 label="Job Name"
+                 value={editingProject.jobName || ''}
+                 onChange={(e) => setEditingProject({ ...editingProject, jobName: e.target.value })}
+                 fullWidth
+                 required
+                 helperText="Job name is required"
+               />
+                             <FormControl fullWidth>
+                 <InputLabel>Status</InputLabel>
+                 <Select
+                   value={editingProject.status || ''}
+                   onChange={(e) => setEditingProject({ ...editingProject, status: e.target.value })}
+                   label="Status"
+                 >
+                   <MenuItem value="">(none)</MenuItem>
+                   <MenuItem value="confirmed">confirmed</MenuItem>
+                   <MenuItem value="completed">completed</MenuItem>
+                   <MenuItem value="TBQ">TBQ</MenuItem>
+                   <MenuItem value="quote sent">quote sent</MenuItem>
+                   <MenuItem value="Quote in progress">Quote in progress</MenuItem>
+                   <MenuItem value="production quote">production quote</MenuItem>
+                   <MenuItem value="won">won</MenuItem>
+                   <MenuItem value="Not progressing">Not progressing</MenuItem>
+                   <MenuItem value="approved">approved</MenuItem>
+                 </Select>
+               </FormControl>
               <FormControl fullWidth>
                 <InputLabel>Curve Mode</InputLabel>
                 <Select
@@ -857,26 +982,26 @@ export default function JobData() {
                   Mathematician: Bell curve distribution, Linear: Even distribution, Triangular: Peak in middle
                 </FormHelperText>
               </FormControl>
-              <TextField
-                label="Truck Date"
-                type="date"
-                value={editingProject.truckDate || ''}
-                onChange={(e) => setEditingProject({ ...editingProject, truckDate: e.target.value })}
-                fullWidth
-                required
-                InputLabelProps={{ shrink: true }}
-                helperText="Date when project is delivered to site"
-              />
-              <TextField
-                label="Lead Weeks"
-                type="number"
-                value={editingProject.weeksBefore || 0}
-                onChange={(e) => setEditingProject({ ...editingProject, weeksBefore: Number(e.target.value) })}
-                fullWidth
-                required
-                inputProps={{ min: 0, step: 1 }}
-                helperText="Number of weeks before truck date to start work"
-              />
+                             <TextField
+                 label="Truck Load Date"
+                 type="date"
+                 value={editingProject.truckLoadDate || ''}
+                 onChange={(e) => setEditingProject({ ...editingProject, truckLoadDate: e.target.value })}
+                 fullWidth
+                 required
+                 InputLabelProps={{ shrink: true }}
+                 helperText="Date when project is delivered to site"
+               />
+                             <TextField
+                 label="Weeks to Build in Wkshop"
+                 type="number"
+                 value={editingProject.weeksToBuild || 0}
+                 onChange={(e) => setEditingProject({ ...editingProject, weeksToBuild: Number(e.target.value) })}
+                 fullWidth
+                 required
+                 inputProps={{ min: 0, step: 1 }}
+                 helperText="Number of weeks to build in workshop"
+               />
               <FormControl fullWidth>
                 <InputLabel>Probability</InputLabel>
                 <Select
@@ -893,54 +1018,80 @@ export default function JobData() {
                 </FormHelperText>
               </FormControl>
               
-              <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Hours by Skill</Typography>
-              {skills.map(skill => (
-                <TextField
-                  key={skill}
-                  label={`${skill} Hours`}
-                  type="number"
-                  value={editingProject.hoursBySkill?.[skill] || 0}
-                  onChange={(e) => setEditingProject({
-                    ...editingProject,
-                    hoursBySkill: {
-                      ...editingProject.hoursBySkill,
-                      [skill]: Number(e.target.value)
-                    }
-                  })}
-                  fullWidth
-                  inputProps={{ min: 0, step: 0.5 }}
-                  helperText={`Total hours required for ${skill} work`}
-                />
-              ))}
+                                            <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Hours by Skill</Typography>
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                  <TextField
+                    label="CNC Hours"
+                    type="number"
+                    value={editingProject.cnc || 0}
+                    onChange={(e) => setEditingProject({ ...editingProject, cnc: Number(e.target.value) })}
+                    inputProps={{ min: 0, step: 0.5 }}
+                    helperText="CNC work hours"
+                  />
+                  <TextField
+                    label="Build Hours"
+                    type="number"
+                    value={editingProject.build || 0}
+                    onChange={(e) => setEditingProject({ ...editingProject, build: Number(e.target.value) })}
+                    inputProps={{ min: 0, step: 0.5 }}
+                    helperText="Build work hours"
+                  />
+                  <TextField
+                    label="Paint Hours"
+                    type="number"
+                    value={editingProject.paint || 0}
+                    onChange={(e) => setEditingProject({ ...editingProject, paint: Number(e.target.value) })}
+                    inputProps={{ min: 0, step: 0.5 }}
+                    helperText="Paint work hours"
+                  />
+                  <TextField
+                    label="AV Hours"
+                    type="number"
+                    value={editingProject.av || 0}
+                    onChange={(e) => setEditingProject({ ...editingProject, av: Number(e.target.value) })}
+                    inputProps={{ min: 0, step: 0.5 }}
+                    helperText="AV work hours"
+                  />
+                  <TextField
+                    label="Pack & Load Hours"
+                    type="number"
+                    value={editingProject.packAndLoad || 0}
+                    onChange={(e) => setEditingProject({ ...editingProject, packAndLoad: Number(e.target.value) })}
+                    inputProps={{ min: 0, step: 0.5 }}
+                    helperText="Pack & Load work hours"
+                  />
+                </Box>
               
-              <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Onsite</Typography>
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                <TextField
-                  label="Onsite Hours"
-                  type="number"
-                  value={editingProject.onsite?.hours || 0}
-                  onChange={(e) => setEditingProject({
-                    ...editingProject,
-                    onsite: { ...editingProject.onsite, hours: Number(e.target.value) }
-                  })}
-                  inputProps={{ min: 0, step: 0.5 }}
-                  helperText="Total hours for onsite work"
-                />
-                <TextField
-                  label="Onsite Weeks"
-                  type="number"
-                  value={editingProject.onsite?.weeks || 0}
-                  onChange={(e) => setEditingProject({
-                    ...editingProject,
-                    onsite: { ...editingProject.onsite, weeks: Number(e.target.value) }
-                  })}
-                  inputProps={{ min: 0, step: 1 }}
-                  helperText="Number of weeks for onsite work"
-                />
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
+                             <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Onsite</Typography>
+               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                 <TextField
+                   label="Trade Onsite Hours"
+                   type="number"
+                   value={editingProject.tradeOnsite || 0}
+                   onChange={(e) => setEditingProject({
+                     ...editingProject,
+                     tradeOnsite: Number(e.target.value)
+                   })}
+                   inputProps={{ min: 0, step: 0.5 }}
+                   helperText="Total hours for trade onsite work"
+                 />
+                 <TextField
+                   label="Onsite Weeks"
+                   type="number"
+                   value={editingProject.onsiteWeeks || 0}
+                   onChange={(e) => setEditingProject({
+                     ...editingProject,
+                     onsiteWeeks: Number(e.target.value)
+                   })}
+                   inputProps={{ min: 0, step: 1 }}
+                   helperText="Number of weeks for onsite work"
+                 />
+               </Box>
+               
+               
+             </Box>
+           )}
+         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
           <Button 
@@ -964,10 +1115,10 @@ export default function JobData() {
         <DialogTitle>Import Projects from CSV</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'grid', gap: 2, pt: 1 }}>
-            <Typography variant="body2" sx={{ color: '#6c757d', mb: 2 }}>
-              Upload a CSV file with project data. The file should include columns for:
-              Project Name, Truck Date, Lead Weeks, Probability, and hours for each skill.
-            </Typography>
+                                       <Typography variant="body2" sx={{ color: '#6c757d', mb: 2 }}>
+                Upload a CSV file with project data. The file should include columns for:
+                Job Number, Job Name, Truck Load Date, Weeks to Build, Probability, CNC, Build, Paint, AV, Pack & Load, Trade Onsite, and Onsite Weeks.
+              </Typography>
             <input
               type="file"
               accept=".csv"

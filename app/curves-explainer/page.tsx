@@ -16,6 +16,21 @@ function triangularWeights(N: number): number[] {
   return rampUpWeights(N); 
 }
 
+function bellCurveWeights(N: number): number[] {
+  if (N <= 1) return [1];
+  
+  const weights = [];
+  for (let i = 0; i < N; i++) {
+    const progress = i / (N - 1);
+    const bell = Math.exp(-Math.pow((progress - 0.5) / 0.2, 2));
+    weights.push(bell);
+  }
+  
+  // Normalize to sum to 1
+  const sum = weights.reduce((a, b) => a + b, 0);
+  return weights.map(w => w / sum);
+}
+
 function interp1(x: number[], y: number[], xq: number) { 
   if (xq <= x[0]) return y[0]; 
   if (xq >= x[x.length - 1]) return y[y.length - 1]; 
@@ -30,24 +45,33 @@ function interp1(x: number[], y: number[], xq: number) {
 function libraryWeights(projectType: string | undefined | null, skill: string, N: number, curveLibrary: any): number[] { 
   const entry = projectType ? curveLibrary?.find((c: any) => c.name === projectType) : undefined; 
   const curve = entry?.curves?.[skill]; 
-  if (!curve || !curve.breaks?.length) return rampUpWeights(N); 
+  if (!curve || !curve.breaks?.length) return bellCurveWeights(N); 
   const xs = curve.breaks.map(Number); 
   const ys = curve.weights.map(Number); 
   const w = Array.from({ length: N }, (_, k) => interp1(xs, ys, (k + 0.5) / N)); 
   const s = w.reduce((a, b) => a + b, 0); 
-  return s > 0 ? w.map(v => v / s) : rampUpWeights(N); 
+  return s > 0 ? w.map(v => v / s) : bellCurveWeights(N); 
 }
 
 export default function CurvesExplainer() {
-  const [selectedProjectType, setSelectedProjectType] = useState<string>('');
+  const [selectedJobType, setSelectedJobType] = useState<string>('');
   const [weeks, setWeeks] = useState<number>(8);
 
-  // Fetch real data from projects and curve library
+  // Fetch real data from projects, job types, and curve library
   const { data: projectsData, isLoading: projectsLoading, error: projectsError } = useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
       const response = await fetch('/api/projects');
       if (!response.ok) throw new Error('Failed to fetch projects');
+      return response.json();
+    }
+  });
+
+  const { data: jobTypesData, isLoading: jobTypesLoading, error: jobTypesError } = useQuery({
+    queryKey: ['job-types'],
+    queryFn: async () => {
+      const response = await fetch('/api/job-types');
+      if (!response.ok) throw new Error('Failed to fetch job types');
       return response.json();
     }
   });
@@ -61,48 +85,49 @@ export default function CurvesExplainer() {
     }
   });
 
-  // Get unique project types
-  const projectTypes = useMemo(() => {
-    if (!projectsData) return [];
-    const types = projectsData.map((p: any) => p.projectType || 'Default').filter(Boolean);
-    const uniqueTypes = Array.from(new Set(types)) as string[];
-    return uniqueTypes;
-  }, [projectsData]);
+  // Get unique job types from the JobTypes collection
+  const jobTypes = useMemo(() => {
+    if (!jobTypesData) return [];
+    return jobTypesData.filter((jt: any) => jt.isActive).map((jt: any) => jt.name);
+  }, [jobTypesData]);
 
-  // Define skills for the curves
+  // Define skills for the curves (matching new project model)
   const skills = ["CNC", "Build", "Paint", "AV", "Pack & Load"];
 
-  // Set initial project type when data loads
+  // Set initial job type when data loads
   useMemo(() => {
-    if (projectTypes.length > 0 && !selectedProjectType) {
-      const firstType = projectTypes[0];
-      if (firstType && typeof firstType === 'string') {
-        setSelectedProjectType(firstType);
-      }
+    if (jobTypes.length > 0 && !selectedJobType) {
+      setSelectedJobType(jobTypes[0]);
     }
-  }, [projectTypes, selectedProjectType]);
+  }, [jobTypes, selectedJobType]);
 
-  // Get projects of selected type with matching build weeks
+  // Get projects of selected job type with matching build weeks
   const matchingProjects = useMemo(() => {
-    if (!projectsData || !selectedProjectType) return [];
-    return projectsData.filter((p: any) => 
-      (p.projectType || 'Default') === selectedProjectType && 
-      p.weeksBefore === weeks
-    );
-  }, [projectsData, selectedProjectType, weeks]);
+    if (!projectsData || !selectedJobType) return [];
+    
+    return projectsData.filter((p: any) => {
+      // Check if project has the selected job type
+      const hasJobType = p.jobType && typeof p.jobType === 'object' && p.jobType.name === selectedJobType;
+      const hasWeeks = p.weeksToBuild === weeks;
+      
+      return hasJobType && hasWeeks;
+    });
+  }, [projectsData, selectedJobType, weeks]);
 
-  // Calculate aggregated project type statistics
-  const projectTypeStats = useMemo(() => {
+  // Calculate aggregated job type statistics
+  const jobTypeStats = useMemo(() => {
     if (!matchingProjects.length) return null;
 
-    // Aggregate data across all matching projects
+    // Aggregate data across all matching projects using new model structure
     const totalHours = matchingProjects.reduce((sum: number, project: any) => {
-      return sum + Object.values(project.hoursBySkill || {}).reduce((pSum: number, hours: any) => pSum + (hours || 0), 0);
+      return sum + (project.cnc || 0) + (project.build || 0) + (project.paint || 0) + 
+                    (project.av || 0) + (project.packAndLoad || 0);
     }, 0);
 
-    const avgWeeksBefore = weeks; // Use the selected weeks
-    const avgOnsiteWeeks = matchingProjects.reduce((sum: number, project: any) => sum + (project.onsite?.weeks || 0), 0) / matchingProjects.length;
-    const totalWeeks = avgWeeksBefore + avgOnsiteWeeks;
+    const avgWeeksToBuild = weeks;
+    const avgOnsiteWeeks = matchingProjects.reduce((sum: number, project: any) => 
+      sum + (project.onsiteWeeks || 0), 0) / matchingProjects.length;
+    const totalWeeks = avgWeeksToBuild + avgOnsiteWeeks;
 
     // Get most common curve mode
     const curveModes = matchingProjects.map((p: any) => p.curveMode || 'Mathematician');
@@ -110,20 +135,28 @@ export default function CurvesExplainer() {
       curveModes.filter((v: string) => v === a).length - curveModes.filter((v: string) => v === b).length
     ).pop() || 'Mathematician';
 
+    // Calculate skill-specific totals
+    const skillTotals = {
+      cnc: matchingProjects.reduce((sum: number, p: any) => sum + (p.cnc || 0), 0),
+      build: matchingProjects.reduce((sum: number, p: any) => sum + (p.build || 0), 0),
+      paint: matchingProjects.reduce((sum: number, p: any) => sum + (p.paint || 0), 0),
+      av: matchingProjects.reduce((sum: number, p: any) => sum + (p.av || 0), 0),
+      packAndLoad: matchingProjects.reduce((sum: number, p: any) => sum + (p.packAndLoad || 0), 0)
+    };
+
     return {
       totalHours,
-      weeksBefore: avgWeeksBefore,
+      weeksToBuild: avgWeeksToBuild,
       onsiteWeeks: avgOnsiteWeeks,
       totalWeeks,
       curveMode: mostCommonCurveMode,
-      projectCount: matchingProjects.length
+      projectCount: matchingProjects.length,
+      skillTotals
     };
   }, [matchingProjects, weeks]);
 
-  // Generate chart datasets with skill-specific Mathematician curves
+  // Generate chart datasets with skill-specific curves
   const datasets = useMemo(() => {
-    if (!curveLibraryData) return [];
-
     const ws = Array.from({ length: weeks }, (_, i) => i + 1);
     
     // Generate chart data
@@ -133,29 +166,33 @@ export default function CurvesExplainer() {
         week: weekNum
       };
       
-      // Add skill-specific Mathematician curves from curve library
+      // Add skill-specific curves from curve library or default to bell curve
       skills.forEach(skill => {
         if (curveLibraryData?.curves) {
-          const skillCurve = libraryWeights(selectedProjectType, skill, weeks, curveLibraryData.curves);
+          const skillCurve = libraryWeights(selectedJobType, skill, weeks, curveLibraryData.curves);
           weekData[skill] = Number((skillCurve[index] || 0).toFixed(4));
         } else {
-          weekData[skill] = 0;
+          // Default to bell curve if no library data
+          const bellCurve = bellCurveWeights(weeks);
+          weekData[skill] = Number((bellCurve[index] || 0).toFixed(4));
         }
       });
       
       // Add theoretical curves for comparison
       const lin = rampUpWeights(weeks);
       const tri = triangularWeights(weeks);
+      const bell = bellCurveWeights(weeks);
       
       weekData["Linear"] = Number((lin[index] || 0).toFixed(4));
       weekData["Triangular"] = Number((tri[index] || 0).toFixed(4));
+      weekData["Bell Curve"] = Number((bell[index] || 0).toFixed(4));
       
       return weekData;
     });
-  }, [weeks, curveLibraryData, selectedProjectType]);
+  }, [weeks, curveLibraryData, selectedJobType]);
 
-  const isLoading = projectsLoading || curveLibraryLoading;
-  const hasError = projectsError || curveLibraryError;
+  const isLoading = projectsLoading || jobTypesLoading || curveLibraryLoading;
+  const hasError = projectsError || jobTypesError || curveLibraryError;
 
   if (isLoading) {
     return (
@@ -183,18 +220,18 @@ export default function CurvesExplainer() {
       }}>
         <CardContent sx={{ p: 3 }}>
           <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>
-            Workload Distribution Curves
+            Workload Distribution Curves by Job Type
           </Typography>
           
           <Box sx={{ display: 'grid', gap: 3 }}>
-            {/* Project Type Selection Controls */}
+            {/* Job Type Selection Controls */}
             <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'end' }}>
               <FormControl sx={{ minWidth: 250 }}>
-                <InputLabel>Project Type</InputLabel>
+                <InputLabel>Job Type</InputLabel>
                 <Select
-                  value={selectedProjectType}
-                  onChange={(e) => setSelectedProjectType(e.target.value)}
-                  label="Project Type"
+                  value={selectedJobType}
+                  onChange={(e) => setSelectedJobType(e.target.value)}
+                  label="Job Type"
                   sx={{
                     '& .MuiOutlinedInput-notchedOutline': {
                       borderColor: '#e2e8f0',
@@ -207,7 +244,7 @@ export default function CurvesExplainer() {
                     },
                   }}
                 >
-                  {projectTypes.map((type) => (
+                  {jobTypes.map((type: string) => (
                     <MenuItem key={type} value={type}>{type}</MenuItem>
                   ))}
                 </Select>
@@ -234,40 +271,81 @@ export default function CurvesExplainer() {
               />
             </Box>
 
-            {/* Project Type Statistics */}
-            {projectTypeStats && (
+            {/* Job Type Statistics */}
+            {jobTypeStats && (
               <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
                 <Card sx={{ p: 2, bgcolor: '#f8f9fa', border: '1px solid #e9ecef' }}>
                   <Typography variant="body2" color="text.secondary">Total Hours</Typography>
                   <Typography variant="h6" sx={{ fontWeight: 600, color: '#667eea' }}>
-                    {projectTypeStats.totalHours.toFixed(1)}h
+                    {jobTypeStats.totalHours.toFixed(1)}h
                   </Typography>
                 </Card>
                 <Card sx={{ p: 2, bgcolor: '#f8f9fa', border: '1px solid #e9ecef' }}>
                   <Typography variant="body2" color="text.secondary">Build Weeks</Typography>
                   <Typography variant="h6" sx={{ fontWeight: 600, color: '#667eea' }}>
-                    {projectTypeStats.weeksBefore} weeks
+                    {jobTypeStats.weeksToBuild} weeks
                   </Typography>
                 </Card>
                 <Card sx={{ p: 2, bgcolor: '#f8f9fa', border: '1px solid #e9ecef' }}>
                   <Typography variant="body2" color="text.secondary">Onsite Weeks</Typography>
                   <Typography variant="h6" sx={{ fontWeight: 600, color: '#667eea' }}>
-                    {projectTypeStats.onsiteWeeks.toFixed(1)} weeks
+                    {jobTypeStats.onsiteWeeks.toFixed(1)} weeks
                   </Typography>
                 </Card>
                 <Card sx={{ p: 2, bgcolor: '#f8f9fa', border: '1px solid #e9ecef' }}>
                   <Typography variant="body2" color="text.secondary">Curve Mode</Typography>
                   <Typography variant="h6" sx={{ fontWeight: 600, color: '#667eea' }}>
-                    {projectTypeStats.curveMode}
+                    {jobTypeStats.curveMode}
                   </Typography>
                 </Card>
                 <Card sx={{ p: 2, bgcolor: '#f8f9fa', border: '1px solid #e9ecef' }}>
                   <Typography variant="body2" color="text.secondary">Projects</Typography>
                   <Typography variant="h6" sx={{ fontWeight: 600, color: '#667eea' }}>
-                    {projectTypeStats.projectCount}
+                    {jobTypeStats.projectCount}
                   </Typography>
                 </Card>
               </Box>
+            )}
+
+            {/* Skill Breakdown */}
+            {jobTypeStats && (
+              <Card sx={{ p: 2, bgcolor: '#f8f9fa', border: '1px solid #e9ecef' }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: '#667eea' }}>
+                  Skill Breakdown for {selectedJobType}
+                </Typography>
+                <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">CNC</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#ff6b6b' }}>
+                      {jobTypeStats.skillTotals.cnc.toFixed(1)}h
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">Build</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#4ecdc4' }}>
+                      {jobTypeStats.skillTotals.build.toFixed(1)}h
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">Paint</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#45b7d1' }}>
+                      {jobTypeStats.skillTotals.paint.toFixed(1)}h
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">AV</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#96ceb4' }}>
+                      {jobTypeStats.skillTotals.av.toFixed(1)}h
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">Pack & Load</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#feca57' }}>
+                      {jobTypeStats.skillTotals.packAndLoad.toFixed(1)}h
+                    </Typography>
+                  </Box>
+                </Box>
+              </Card>
             )}
             
             {/* Chart */}
@@ -299,13 +377,13 @@ export default function CurvesExplainer() {
                     }}
                   />
                   
-                  {/* Skill-specific Mathematician curves */}
+                  {/* Skill-specific curves */}
                   {skills.map((skill, index) => (
                     <Line 
                       key={skill} 
                       type="monotone" 
                       dataKey={skill} 
-                      name={`${skill} (Mathematician)`}
+                      name={`${skill} (${curveLibraryData?.curves ? 'Library' : 'Bell Curve'})`}
                       dot={false} 
                       strokeWidth={3}
                       stroke={[
@@ -329,21 +407,32 @@ export default function CurvesExplainer() {
                   <Line 
                     type="monotone" 
                     dataKey="Linear" 
-                    name="Linear"
+                    name="Linear (Uniform)"
                     dot={false} 
                     strokeWidth={2}
                     stroke="#feca57"
+                    strokeDasharray="5 5"
                     activeDot={{ r: 6, stroke: '#feca57', strokeWidth: 2 }}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="Triangular" 
-                    name="Triangular"
+                    name="Triangular (Peak at End)"
                     dot={false} 
                     strokeWidth={2}
                     stroke="#6c5ce7"
                     strokeDasharray="10 5"
                     activeDot={{ r: 6, stroke: '#6c5ce7', strokeWidth: 2 }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="Bell Curve" 
+                    name="Bell Curve (Peak in Middle)"
+                    dot={false} 
+                    strokeWidth={2}
+                    stroke="#00b894"
+                    strokeDasharray="15 5"
+                    activeDot={{ r: 6, stroke: '#00b894', strokeWidth: 2 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -357,9 +446,11 @@ export default function CurvesExplainer() {
             }}>
               <CardContent sx={{ p: 2 }}>
                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13, lineHeight: 1.5 }}>
-                  <strong>Mathematician curves</strong> are pulled per project type & skill from your original workbook (sheet "Stats"). We resample and normalise to 1. 
-                  <strong>Triangular</strong> is Option A (peak at truck, pre-truck only). 
-                  <strong>Linear</strong> represents a uniform distribution of workload across the build period.
+                  <strong>Workload Distribution Curves</strong> show how project hours are distributed across the build timeline for different job types and skills. 
+                  <strong>Library curves</strong> are pulled from your curve library data when available. 
+                  <strong>Bell Curve</strong> represents a normal distribution with peak workload in the middle. 
+                  <strong>Triangular</strong> shows increasing workload towards the end (truck date). 
+                  <strong>Linear</strong> represents uniform distribution across all weeks.
                 </Typography>
               </CardContent>
             </Card>
