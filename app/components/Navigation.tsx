@@ -13,7 +13,6 @@ export default function Navigation() {
     { label: "Dashboard", href: "/dashboard" },
     { label: "Job Data", href: "/job-data" },
     { label: "Employees", href: "/employees" },
-    { label: "Job Types", href: "/job-types" },
     { label: "Curves Explainer", href: "/curves-explainer" },
   ];
 
