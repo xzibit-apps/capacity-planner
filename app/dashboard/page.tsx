@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import {
   Box,
+  Grid,
   Card,
   CardContent,
   Typography,
@@ -128,7 +129,6 @@ function calculateWeeklyDemand(projects: any[], weeks: any[], includeOnsite: boo
   // Process each project with realistic distribution
   projects.forEach(project => {
     const processed = processProjectForDashboard(project);
-    
     // Skip projects with no build hours
     if (processed.totalBuildHours === 0) return;
     
@@ -190,9 +190,6 @@ function calculateWeeklyDemand(projects: any[], weeks: any[], includeOnsite: boo
   return demand;
 }
 
-// Note: Curve generation functions removed - all modes now use same data with different visual representation
-
-// Calculate realistic capacity with employee leave consideration
 function calculateWeeklyCapacity(staff: any[], weeks: any[]) {
   const capacity = {
     total: {} as Record<string, number>
@@ -203,34 +200,35 @@ function calculateWeeklyCapacity(staff: any[], weeks: any[]) {
     capacity.total[week.weekStart] = 0;
   });
 
-  // Calculate capacity: 40 hours per week per staff member, minus leave
   staff.forEach(person => {
-    const weeklyHours = 40; // 8 hours/day * 5 days/week
-    
+    const weeklyHours = 40;
+    const dailyHours = person.dailyHours || 8;
+
     weeks.forEach(week => {
       let availableHours = weeklyHours;
-      
-      // Check if staff member is on leave this week
+
       if (person.leave && Array.isArray(person.leave)) {
         const weekStart = new Date(week.weekStart);
         const weekEnd = new Date(week.weekStart);
         weekEnd.setDate(weekEnd.getDate() + 6);
-        
-        // Check if any leave dates fall within this week
-        const hasLeaveThisWeek = person.leave.some((leave: any) => {
+
+        // Filter leaves that fall within this week
+        const leavesThisWeek = person.leave.filter((leave: any) => {
           try {
             const leaveDate = new Date(leave.date);
             return leaveDate >= weekStart && leaveDate <= weekEnd;
-          } catch (error) {
+          } catch {
             return false;
           }
         });
-        
-        if (hasLeaveThisWeek) {
-          availableHours = 0; // Full week off
+
+        // Minus daily hours for each leave day
+        if (leavesThisWeek.length > 0) {
+          availableHours -= leavesThisWeek.length * dailyHours;
+          if (availableHours < 0) availableHours = 0; // precaution
         }
       }
-      
+
       capacity.total[week.weekStart] += availableHours;
     });
   });
@@ -426,7 +424,8 @@ export default function Dashboard() {
             backdropFilter: "blur(10px)",
           }}>
             {/* Probability Slider */}
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1, justifyContent: "center" }}>
+            <Grid item xs={12} sm={6} md={3} lg={2}>
+<Box sx={{ display: "flex", flexDirection: "column", gap: 1, justifyContent: "center" }}>
               <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, textAlign: "center" }}>
                 Probability ≥ {probability}%
               </Typography>
@@ -445,8 +444,9 @@ export default function Dashboard() {
                 }}
               />
             </Box>
-
-            {/* Skill Visibility */}
+            </Grid>
+            <Grid item xs={12} sm={6} md={3} lg={2}>
+               {/* Skill Visibility */}
             <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
               <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 1 }}>
                 Skill Lines
@@ -473,8 +473,9 @@ export default function Dashboard() {
                 ))}
               </Box>
             </Box>
-
-            {/* Include Site Install */}
+            </Grid>
+            <Grid item xs={12} sm={6} md={3} lg={2}>
+                          {/* Include Site Install */}
             <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
               <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 1 }}>
                 Site Install
@@ -497,6 +498,8 @@ export default function Dashboard() {
               />
             </Box>
 
+            </Grid>
+            <Grid item xs={12} sm={6} md={3} lg={2}>
                          {/* Curve Selection */}
              <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
                <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 1, textAlign: "center" }}>
@@ -542,7 +545,9 @@ export default function Dashboard() {
                  </Typography>
              </Box>
 
-                         {/* Date Range Filter */}
+            </Grid>
+            <Grid item xs={12} sm={6} md={3} lg={2}>
+                              {/* Date Range Filter */}
              <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
                <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 1 }}>
                  Date Range
@@ -616,8 +621,9 @@ export default function Dashboard() {
                  </Button>
                </Box>
              </Box>
-
-            {/* Date Range */}
+            </Grid>
+            <Grid item xs={12} sm={6} md={3} lg={2}>
+              {/* Date Range */}
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1, justifyContent: "center" }}>
                 <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, textAlign: "center" }}>
@@ -683,9 +689,10 @@ export default function Dashboard() {
                 </Box>
               </Box>
             </LocalizationProvider>
-
+            </Grid>   
             {/* Summary */}
-            <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+            <Grid item xs={12} sm={6} md={3} lg={2}>
+              <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
               <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 1 }}>
                 Summary
               </Typography>
@@ -718,6 +725,8 @@ export default function Dashboard() {
                 </Box>
               </Box>
             </Box>
+            </Grid>
+            
           </Box>
         </CardContent>
       </Card>

@@ -751,7 +751,13 @@ export default function EmployeeView() {
                       label="Start Date"
                       format="DD/MM/YYYY"
                       value={newLeaveStartDate}
-                      onChange={(date) => setNewLeaveStartDate(date)}
+                      onChange={(date) => {
+                        if (date) {
+                          setNewLeaveStartDate(date.startOf("day"));
+                        } else {
+                          setNewLeaveStartDate(null);
+                        }
+                      }}
                       slotProps={{
                         textField: {
                           fullWidth: true,
@@ -768,7 +774,13 @@ export default function EmployeeView() {
                       label="End Date"
                       format="DD/MM/YYYY"
                       value={newLeaveEndDate}
-                      onChange={(date) => setNewLeaveEndDate(date)}
+                      onChange={(date) => {
+                        if (date) {
+                          setNewLeaveStartDate(date.startOf("day"));
+                        } else {
+                          setNewLeaveStartDate(null);
+                        }
+                      }}
                       slotProps={{
                         textField: {
                           fullWidth: true,
