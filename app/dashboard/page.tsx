@@ -407,26 +407,33 @@ export default function Dashboard() {
         boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
         borderRadius: 3,
       }}>
-        <CardContent sx={{ p: 3 }}>
-                     <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 3, color: "white" }}>
-             {dateRangeFilter === 'next' ? 'NEXT 12 MONTHS' : 'PREVIOUS 12 MONTHS'} DASHBOARD - Realistic Workload Distribution
-           </Typography>
-          
+        <CardContent sx={{ p: 2 }}>
           <Box sx={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: 2,
-            mt: 2,
-            p: 2,
+            display: "flex",
+            flexDirection: "row",
+            gap: 1.5,
+            mt: 1,
+            p: 1.5,
             backgroundColor: "rgba(255,255,255,0.08)",
             borderRadius: 2,
             border: "1px solid rgba(255,255,255,0.15)",
             backdropFilter: "blur(10px)",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "center"
           }}>
             {/* Probability Slider */}
-            <Grid item xs={12} sm={6} md={3} lg={2}>
-<Box sx={{ display: "flex", flexDirection: "column", gap: 1, justifyContent: "center" }}>
-              <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, textAlign: "center" }}>
+            <Box sx={{ 
+              display: "flex", 
+              flexDirection: "column", 
+              gap: 0.5, 
+              p: 1,
+              backgroundColor: "rgba(255,255,255,0.05)",
+              borderRadius: 1,
+              border: "1px solid rgba(255,255,255,0.1)",
+              minWidth: "140px"
+            }}>
+              <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, textAlign: "center", fontSize: "0.7rem" }}>
                 Probability ≥ {probability}%
               </Typography>
               <Slider
@@ -437,21 +444,31 @@ export default function Dashboard() {
                 step={10}
                 marks
                 valueLabelDisplay="auto"
+                size="small"
                 sx={{
-                  "& .MuiSlider-track": { backgroundColor: "rgba(255,255,255,0.9)", height: 4 },
-                  "& .MuiSlider-thumb": { backgroundColor: "white", width: 18, height: 18 },
+                  "& .MuiSlider-track": { backgroundColor: "rgba(255,255,255,0.9)", height: 2 },
+                  "& .MuiSlider-thumb": { backgroundColor: "white", width: 14, height: 14 },
                   "& .MuiSlider-mark": { backgroundColor: "rgba(255,255,255,0.6)" },
                 }}
               />
             </Box>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3} lg={2}>
-               {/* Skill Visibility */}
-            <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
-              <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 1 }}>
+
+            {/* Skill Visibility */}
+            <Box sx={{ 
+              display: "flex", 
+              flexDirection: "column", 
+              justifyContent: "center", 
+              alignItems: "center",
+              p: 1,
+              backgroundColor: "rgba(255,255,255,0.05)",
+              borderRadius: 1,
+              border: "1px solid rgba(255,255,255,0.1)",
+              minWidth: "120px"
+            }}>
+              <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 0.5, fontSize: "0.7rem" }}>
                 Skill Lines
               </Typography>
-              <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", justifyContent: "center" }}>
+              <Box sx={{ display: "flex", gap: 0.3, flexWrap: "wrap", justifyContent: "center" }}>
                 {Object.entries(skillVisibility).map(([skill, visible]) => (
                   <FormControlLabel
                     key={skill}
@@ -464,7 +481,7 @@ export default function Dashboard() {
                       />
                     }
                     label={
-                      <Typography variant="caption" sx={{ color: "white", fontWeight: 500, fontSize: "0.7rem" }}>
+                      <Typography variant="caption" sx={{ color: "white", fontWeight: 500, fontSize: "0.55rem" }}>
                         {skill === "Pack & Load" ? "P&L" : skill}
                       </Typography>
                     }
@@ -473,11 +490,20 @@ export default function Dashboard() {
                 ))}
               </Box>
             </Box>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3} lg={2}>
-                          {/* Include Site Install */}
-            <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
-              <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 1 }}>
+
+            {/* Include Site Install */}
+            <Box sx={{ 
+              display: "flex", 
+              flexDirection: "column", 
+              justifyContent: "center", 
+              alignItems: "center",
+              p: 1,
+              backgroundColor: "rgba(255,255,255,0.05)",
+              borderRadius: 1,
+              border: "1px solid rgba(255,255,255,0.1)",
+              minWidth: "100px"
+            }}>
+              <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 0.5, fontSize: "0.7rem" }}>
                 Site Install
               </Typography>
               <FormControlLabel
@@ -490,7 +516,7 @@ export default function Dashboard() {
                   />
                 }
                 label={
-                  <Typography variant="caption" sx={{ color: "white", fontWeight: 500, fontSize: "0.7rem" }}>
+                  <Typography variant="caption" sx={{ color: "white", fontWeight: 500, fontSize: "0.55rem" }}>
                     Include Onsite
                   </Typography>
                 }
@@ -498,235 +524,252 @@ export default function Dashboard() {
               />
             </Box>
 
-            </Grid>
-            <Grid item xs={12} sm={6} md={3} lg={2}>
-                         {/* Curve Selection */}
-             <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
-               <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 1, textAlign: "center" }}>
-                 Curve Selection (applies to all projects)
-               </Typography>
-               <ToggleButtonGroup
-                 value={curveMode}
-                 exclusive
-                 onChange={(_, newMode) => newMode && setCurveMode(newMode)}
-                 size="small"
-                 sx={{
-                   backgroundColor: "rgba(255,255,255,0.1)",
-                   border: "1px solid rgba(255,255,255,0.2)",
-                   "& .MuiToggleButton-root": {
-                     color: "rgba(255,255,255,0.8)",
-                     borderColor: "rgba(255,255,255,0.2)",
-                     fontSize: "0.7rem",
-                     px: 1,
-                     py: 0.5,
-                     "&.Mui-selected": {
-                       backgroundColor: "rgba(255,255,255,0.2)",
-                       color: "white",
-                       fontWeight: 600,
-                     },
-                     "&:hover": {
-                       backgroundColor: "rgba(255,255,255,0.15)",
-                     },
-                   },
-                 }}
-               >
-                 <ToggleButton value="adrian" sx={{ minWidth: "60px" }}>
-                   Adrian
-                 </ToggleButton>
-                 <ToggleButton value="flat" sx={{ minWidth: "60px" }}>
-                   Flat
-                 </ToggleButton>
-                 <ToggleButton value="linear" sx={{ minWidth: "60px" }}>
-                   Linear
-                 </ToggleButton>
-               </ToggleButtonGroup>
-                                                               <Typography variant="caption" sx={{ opacity: 0.8, textAlign: "center", mt: 0.5, fontSize: "0.6rem" }}>
-                   Adrian: Smooth curves | Flat: Straight lines | Linear: Straight lines (Same data, different visual)
-                 </Typography>
-             </Box>
+            {/* Curve Selection */}
+            <Box sx={{ 
+              display: "flex", 
+              flexDirection: "column", 
+              justifyContent: "center", 
+              alignItems: "center",
+              p: 1,
+              backgroundColor: "rgba(255,255,255,0.05)",
+              borderRadius: 1,
+              border: "1px solid rgba(255,255,255,0.1)",
+              minWidth: "140px"
+            }}>
+              <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 0.5, textAlign: "center", fontSize: "0.7rem" }}>
+                Curve Selection
+              </Typography>
+              <ToggleButtonGroup
+                value={curveMode}
+                exclusive
+                onChange={(_, newMode) => newMode && setCurveMode(newMode)}
+                size="small"
+                sx={{
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  "& .MuiToggleButton-root": {
+                    color: "rgba(255,255,255,0.8)",
+                    borderColor: "rgba(255,255,255,0.2)",
+                    fontSize: "0.55rem",
+                    px: 0.6,
+                    py: 0.3,
+                    minWidth: "45px",
+                    "&.Mui-selected": {
+                      backgroundColor: "rgba(255,255,255,0.2)",
+                      color: "white",
+                      fontWeight: 600,
+                    },
+                    "&:hover": {
+                      backgroundColor: "rgba(255,255,255,0.15)",
+                    },
+                  },
+                }}
+              >
+                <ToggleButton value="adrian">Adrian</ToggleButton>
+                <ToggleButton value="flat">Flat</ToggleButton>
+                <ToggleButton value="linear">Linear</ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
 
-            </Grid>
-            <Grid item xs={12} sm={6} md={3} lg={2}>
-                              {/* Date Range Filter */}
-             <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
-               <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 1 }}>
-                 Date Range
-               </Typography>
-               <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center", flexDirection: "column" }}>
-                 <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
-                   <Button
-                     size="small"
-                     variant={dateRangeFilter === 'next' ? "contained" : "outlined"}
-                     onClick={() => setDateRangeFilter('next')}
-                     sx={{
-                       color: dateRangeFilter === 'next' ? "white" : "rgba(255,255,255,0.9)",
-                       backgroundColor: dateRangeFilter === 'next' ? "rgba(255,255,255,0.2)" : "transparent",
-                       borderColor: "rgba(255,255,255,0.3)",
-                       fontSize: "0.7rem",
-                       py: 0.5,
-                       px: 1,
-                       minWidth: "auto",
-                       "&:hover": {
-                         borderColor: "white",
-                         backgroundColor: dateRangeFilter === 'next' ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)",
-                       }
-                     }}
-                   >
-                     Next 12M
-                   </Button>
-                   <Button
-                     size="small"
-                     variant={dateRangeFilter === 'previous' ? "contained" : "outlined"}
-                     onClick={() => setDateRangeFilter('previous')}
-                     sx={{
-                       color: dateRangeFilter === 'previous' ? "white" : "rgba(255,255,255,0.9)",
-                       backgroundColor: dateRangeFilter === 'previous' ? "rgba(255,255,255,0.2)" : "transparent",
-                       borderColor: "rgba(255,255,255,0.3)",
-                       fontSize: "0.7rem",
-                       py: 0.5,
-                       px: 1,
-                       minWidth: "auto",
-                       "&:hover": {
-                         borderColor: "white",
-                         backgroundColor: dateRangeFilter === 'previous' ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)",
-                       }
-                     }}
-                   >
-                     Previous 12M
-                   </Button>
-                 </Box>
-                 <Button
-                   size="small"
-                   variant="outlined"
-                   onClick={() => {
-                     setDateRangeFilter('next');
-                     setStartDate(dayjs().subtract(1, "week"));
-                     setEndDate(dayjs().add(12, "month"));
-                   }}
-                   sx={{
-                     color: "rgba(255,255,255,0.9)",
-                     borderColor: "rgba(255,255,255,0.3)",
-                     fontSize: "0.6rem",
-                     py: 0.3,
-                     px: 0.8,
-                     minWidth: "auto",
-                     mt: 0.5,
-                     "&:hover": {
-                       borderColor: "white",
-                       backgroundColor: "rgba(255,255,255,0.1)",
-                     }
-                   }}
-                 >
-                   Reset to Next 12M
-                 </Button>
-               </Box>
-             </Box>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3} lg={2}>
-              {/* Date Range */}
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1, justifyContent: "center" }}>
-                <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, textAlign: "center" }}>
-                  Date Range
-                </Typography>
-                <Box sx={{ display: "flex", gap: 1, justifyContent: "center" }}>
-                                     <DatePicker
-                     value={startDate}
-                     onChange={(v) => v && setStartDate(v)}
-                     format="DD/MM/YYYY"
-                     slotProps={{
-                       textField: {
-                         size: "medium",
-                         placeholder: "Start",
-                         sx: {
-                           border: "1px solid white",
-                           "& .MuiInputBase-root": { 
-                             color: "white", 
-                             border: "1px solid white",
-                             minWidth: "120px"
-                           },
-                           "& .MuiOutlinedInput-notchedOutline": { border: "none" },
-                           "& .MuiInputBase-input": {
-                             fontSize: "14px",
-                             padding: "16.5px 14px",
-                             minHeight: "1.4375em"
-                           },
-                           "& .MuiInputLabel-root": {
-                             fontSize: "14px"
-                           }
-                         },
-                       },
-                     }}
-                   />
-                                     <DatePicker
-                     value={endDate}
-                     onChange={(v) => v && setEndDate(v)}
-                     format="DD/MM/YYYY"
-                     slotProps={{
-                       textField: {
-                         size: "medium",
-                         placeholder: "End",
-                         sx: {
-                           border: "1px solid white",
-                           "& .MuiInputBase-root": { 
-                             color: "white", 
-                             border: "1px solid white",
-                             minWidth: "120px"
-                           },
-                           "& .MuiOutlinedInput-notchedOutline": { border: "none" },
-                           "& .MuiInputBase-input": {
-                             fontSize: "14px",
-                             padding: "16.5px 14px",
-                             minHeight: "1.4375em"
-                           },
-                           "& .MuiInputLabel-root": {
-                             fontSize: "14px"
-                           }
-                         },
-                       },
-                     }}
-                   />
-                </Box>
+            {/* Quick Date Range */}
+            <Box sx={{ 
+              display: "flex", 
+              flexDirection: "column", 
+              justifyContent: "center", 
+              alignItems: "center",
+              p: 1,
+              backgroundColor: "rgba(255,255,255,0.05)",
+              borderRadius: 1,
+              border: "1px solid rgba(255,255,255,0.1)",
+              minWidth: "140px"
+            }}>
+              <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 0.5, fontSize: "0.7rem" }}>
+                Quick Date Range
+              </Typography>
+              <Box sx={{ display: "flex", gap: 0.3, justifyContent: "center" }}>
+                <Button
+                  size="small"
+                  variant={dateRangeFilter === 'next' ? "contained" : "outlined"}
+                  onClick={() => setDateRangeFilter('next')}
+                  sx={{
+                    color: dateRangeFilter === 'next' ? "white" : "rgba(255,255,255,0.9)",
+                    backgroundColor: dateRangeFilter === 'next' ? "rgba(255,255,255,0.2)" : "transparent",
+                    borderColor: "rgba(255,255,255,0.3)",
+                    fontSize: "0.55rem",
+                    py: 0.3,
+                    px: 0.6,
+                    minWidth: "60px",
+                    "&:hover": {
+                      borderColor: "white",
+                      backgroundColor: dateRangeFilter === 'next' ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)",
+                    }
+                  }}
+                >
+                  Next 12M
+                </Button>
+                <Button
+                  size="small"
+                  variant={dateRangeFilter === 'previous' ? "contained" : "outlined"}
+                  onClick={() => setDateRangeFilter('previous')}
+                  sx={{
+                    color: dateRangeFilter === 'previous' ? "white" : "rgba(255,255,255,0.9)",
+                    backgroundColor: dateRangeFilter === 'previous' ? "rgba(255,255,255,0.2)" : "transparent",
+                    borderColor: "rgba(255,255,255,0.3)",
+                    fontSize: "0.55rem",
+                    py: 0.3,
+                    px: 0.6,
+                    minWidth: "60px",
+                    "&:hover": {
+                      borderColor: "white",
+                      backgroundColor: dateRangeFilter === 'previous' ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)",
+                    }
+                  }}
+                >
+                  Previous 12M
+                </Button>
               </Box>
-            </LocalizationProvider>
-            </Grid>   
+            </Box>
+
+            {/* Custom Date Range */}
+            <Box sx={{ 
+              display: "flex", 
+              flexDirection: "column", 
+              gap: 0.5, 
+              p: 1,
+              backgroundColor: "rgba(255,255,255,0.05)",
+              borderRadius: 1,
+              border: "1px solid rgba(255,255,255,0.1)",
+              minWidth: "160px"
+            }}>
+              <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, textAlign: "center", fontSize: "0.7rem" }}>
+                Custom Date Range
+              </Typography>
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <Box sx={{ display: "flex", flexDirection: "row", gap: 0.5 }}>
+                  <DatePicker
+                    value={startDate}
+                    onChange={(v) => v && setStartDate(v)}
+                    format="DD/MM/YYYY"
+                    slotProps={{
+                      textField: {
+                        size: "small",
+                        placeholder: "Start",
+                        sx: {
+                          "& .MuiInputBase-root": { 
+                            color: "white", 
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                            border: "1px solid rgba(255,255,255,0.3)",
+                            borderRadius: 1,
+                            "&:hover": {
+                              borderColor: "rgba(255,255,255,0.5)",
+                            },
+                            "&:focus-within": {
+                              borderColor: "white",
+                            }
+                          },
+                          "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                          "& .MuiInputBase-input": {
+                            fontSize: "10px",
+                            padding: "4px 8px",
+                            "&::placeholder": {
+                              color: "rgba(255,255,255,0.6)",
+                              opacity: 1
+                            }
+                          },
+                          "& .MuiInputLabel-root": {
+                            color: "rgba(255,255,255,0.7)",
+                            fontSize: "10px"
+                          }
+                        },
+                      },
+                    }}
+                  />
+                  <DatePicker
+                    value={endDate}
+                    onChange={(v) => v && setEndDate(v)}
+                    format="DD/MM/YYYY"
+                    slotProps={{
+                      textField: {
+                        size: "small",
+                        placeholder: "End",
+                        sx: {
+                          "& .MuiInputBase-root": { 
+                            color: "white", 
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                            border: "1px solid rgba(255,255,255,0.3)",
+                            borderRadius: 1,
+                            "&:hover": {
+                              borderColor: "rgba(255,255,255,0.5)",
+                            },
+                            "&:focus-within": {
+                              borderColor: "white",
+                            }
+                          },
+                          "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                          "& .MuiInputBase-input": {
+                            fontSize: "10px",
+                            padding: "4px 8px",
+                            "&::placeholder": {
+                              color: "rgba(255,255,255,0.6)",
+                              opacity: 1
+                            }
+                          },
+                          "& .MuiInputLabel-root": {
+                            color: "rgba(255,255,255,0.7)",
+                            fontSize: "10px"
+                          }
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+              </LocalizationProvider>
+            </Box>
+
             {/* Summary */}
-            <Grid item xs={12} sm={6} md={3} lg={2}>
-              <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
-              <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 1 }}>
+            <Box sx={{ 
+              display: "flex", 
+              flexDirection: "column", 
+              justifyContent: "center", 
+              alignItems: "center",
+              p: 1,
+              backgroundColor: "rgba(255,255,255,0.05)",
+              borderRadius: 1,
+              border: "1px solid rgba(255,255,255,0.1)",
+              minWidth: "140px"
+            }}>
+              <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mb: 0.5, fontSize: "0.7rem" }}>
                 Summary
               </Typography>
-              <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+              <Box sx={{ display: "flex", gap: 0.8, alignItems: "center" }}>
                 <Box sx={{ textAlign: "center" }}>
-                  <Typography variant="h6" sx={{ color: "white", fontWeight: 600, mb: 0 }}>
+                  <Typography variant="h6" sx={{ color: "white", fontWeight: 600, mb: 0, fontSize: "0.9rem" }}>
                     {filteredProjects.length}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)" }}>
+                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", fontSize: "0.5rem" }}>
                     Projects
                   </Typography>
                 </Box>
-                <Box sx={{ width: "1px", height: "30px", backgroundColor: "rgba(255,255,255,0.2)" }} />
+                <Box sx={{ width: "1px", height: "14px", backgroundColor: "rgba(255,255,255,0.2)" }} />
                 <Box sx={{ textAlign: "center" }}>
-                  <Typography variant="h6" sx={{ color: "white", fontWeight: 600, mb: 0 }}>
+                  <Typography variant="h6" sx={{ color: "white", fontWeight: 600, mb: 0, fontSize: "0.9rem" }}>
                     {staff.length}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)" }}>
+                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", fontSize: "0.5rem" }}>
                     Staff
                   </Typography>
                 </Box>
-                <Box sx={{ width: "1px", height: "30px", backgroundColor: "rgba(255,255,255,0.2)" }} />
+                <Box sx={{ width: "1px", height: "14px", backgroundColor: "rgba(255,255,255,0.2)" }} />
                 <Box sx={{ textAlign: "center" }}>
-                  <Typography variant="h6" sx={{ color: "white", fontWeight: 600, mb: 0 }}>
+                  <Typography variant="h6" sx={{ color: "white", fontWeight: 600, mb: 0, fontSize: "0.9rem" }}>
                     {weeks.length}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)" }}>
+                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", fontSize: "0.5rem" }}>
                     Weeks
                   </Typography>
                 </Box>
               </Box>
             </Box>
-            </Grid>
-            
           </Box>
         </CardContent>
       </Card>
