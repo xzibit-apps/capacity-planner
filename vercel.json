@@ -1,9 +1,15 @@
 {
   "functions": {
-    "app/api/sync/pull/route.ts": {
+    "app/api/import-excel/route.ts": {
       "maxDuration": 300
     },
-    "app/api/sync/push/route.ts": {
+    "app/api/data/import/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/google-sheets/import/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/curve-library/import/route.ts": {
       "maxDuration": 300
     }
   }
