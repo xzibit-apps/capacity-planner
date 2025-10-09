@@ -1,0 +1,222 @@
+/* Reset and base styles */
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Professional animations and effects */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+/* Apply animations to components */
+.MuiCard-root {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.MuiButton-root {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.MuiTab-root {
+  animation: slideIn 0.2s ease-out;
+}
+
+/* Enhanced hover effects */
+.MuiButton-root:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.07), 0px 2px 4px rgba(0, 0, 0, 0.06) !important;
+}
+
+.MuiCard-root:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.07), 0px 2px 4px rgba(0, 0, 0, 0.06) !important;
+}
+
+.MuiTab-root:hover {
+  transform: translateY(-1px) !important;
+  background-color: rgba(30, 64, 175, 0.04) !important;
+}
+
+.MuiChip-root:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+.MuiIconButton-root:hover {
+  transform: scale(1.1) !important;
+  background-color: rgba(30, 64, 175, 0.08) !important;
+}
+
+/* Professional scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Loading states */
+.loading-shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Professional focus states */
+.MuiButton-root:focus-visible {
+  outline: 2px solid #1e40af;
+  outline-offset: 2px;
+}
+
+.MuiTab-root:focus-visible {
+  outline: 2px solid #1e40af;
+  outline-offset: 2px;
+}
+
+/* Enhanced typography */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+/* Professional spacing */
+.section-spacing {
+  margin: 2rem 0;
+}
+
+.card-spacing {
+  margin: 1rem 0;
+}
+
+/* Responsive design helpers */
+@media (max-width: 768px) {
+  .section-spacing {
+    margin: 1rem 0;
+  }
+  
+  .card-spacing {
+    margin: 0.5rem 0;
+  }
+}
+
+/* Force modern appearance */
+.MuiAppBar-root {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1), 0px 1px 2px rgba(0, 0, 0, 0.06) !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.MuiTab-root {
+  color: #475569 !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+}
+
+.MuiTab-root.Mui-selected {
+  color: #1e40af !important;
+  font-weight: 600 !important;
+}
+
+.MuiTabs-indicator {
+  background-color: #1e40af !important;
+  height: 3px !important;
+}
+
+.MuiButton-root {
+  text-transform: none !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+}
+
+.MuiCard-root {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+}
+
+.MuiPaper-root {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+}
