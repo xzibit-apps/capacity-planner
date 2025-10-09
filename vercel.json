@@ -1,10 +1,4 @@
 {
-  "functions": {
-    "app/api/sync/pull/route.ts": {
-      "maxDuration": 300
-    },
-    "app/api/sync/push/route.ts": {
-      "maxDuration": 300
-    }
-  }
+  "buildCommand": "next build",
+  "outputDirectory": ".next"
 }
