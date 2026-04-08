@@ -6,7 +6,8 @@ export async function GET() {
     const { data: allRows, error } = await supabase.from('cp_rows').select('*').limit(5);
     if (error) throw error;
 
-    const { data: sheetCounts } = await supabase.rpc('get_cp_rows_sheet_counts').catch(() => ({ data: null }));
+    let sheetCounts: any = null;
+    try { const r = await supabase.rpc('get_cp_rows_sheet_counts'); sheetCounts = r.data; } catch (_) {}
 
     // Fallback: manual count per sheet
     const sheets = ['capacity', 'demand', 'supply', 'projects', 'staff', 'job-database'];
