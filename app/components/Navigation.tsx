@@ -88,6 +88,28 @@ export default function Navigation() {
                 </Link>
               ))}
             </Box>
+
+            {/* Apps Home button */}
+            <Box sx={{ ml: 2 }}>
+              <a
+                href="https://xzibit-apps.vercel.app"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  color: 'rgba(255,255,255,0.85)',
+                  fontSize: '0.85rem',
+                  fontWeight: 500,
+                  textDecoration: 'none',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                ← Apps Home
+              </a>
+            </Box>
           </Toolbar>
         </Container>
       </AppBar>
