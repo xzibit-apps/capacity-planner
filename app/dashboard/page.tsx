@@ -747,48 +747,51 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Debug Info */}
-      <Card sx={{ boxShadow: "0 4px 20px rgba(0,0,0,0.08)", borderRadius: 3 }}>
-        <CardContent sx={{ p: 3 }}>
-                     <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
-             DEBUG INFO - {dateRangeFilter === 'next' ? 'Next' : 'Previous'} 12 Months Logic
-           </Typography>
-          
-          <Box sx={{ display: "grid", gap: 2 }}>
-            <Typography variant="body2">
+      {/* Debug info */}
+      <Card>
+        <CardContent>
+          <div className="card-head">
+            <div>
+              <div className="h3">Debug info</div>
+              <div className="card-sub">
+                {dateRangeFilter === 'next' ? 'Next' : 'Previous'} 12 months logic
+              </div>
+            </div>
+          </div>
+          <Box sx={{ display: "grid", gap: 1 }}>
+            <div className="meta">
               <strong>Total Projects:</strong> {projects.length} | <strong>Filtered Projects (Complete Data Only):</strong> {filteredProjects.length}
-            </Typography>
-            <Typography variant="body2">
+            </div>
+            <div className="meta">
               <strong>Total Staff:</strong> {staffCount}
-            </Typography>
-            <Typography variant="body2">
+            </div>
+            <div className="meta">
               <strong>Weeks Generated:</strong> {weeks.length}
-            </Typography>
-            <Typography variant="body2">
+            </div>
+            <div className="meta">
               <strong>First Week Demand:</strong> {weeks.length > 0 ? (demand.total[weeks[0].weekStart] || 0) : 0} hours
-            </Typography>
-            <Typography variant="body2">
+            </div>
+            <div className="meta">
               <strong>First Week Capacity:</strong> {weeks.length > 0 ? (capacity.total[weeks[0].weekStart] || 0) : 0} hours
-            </Typography>
-            <Typography variant="body2">
+            </div>
+            <div className="meta">
               <strong>Current Week:</strong> {weeks.find((w: any) => w.isCurrentWeek)?.weekLabel || 'Not in range'}
-            </Typography>
-                         <Typography variant="body2">
-               <strong>Timeline:</strong> {startDate.format('DD/MM/YYYY')} to {endDate.format('DD/MM/YYYY')}
-             </Typography>
-             <Typography variant="body2">
-               <strong>Demand Engine:</strong> Whiplash curve-based distribution
-             </Typography>
-             <Typography variant="body2">
-               <strong>Projects Excluded (Incomplete Data):</strong> {projects.length - completeProjects.length}
-             </Typography>
-             <Typography variant="body2" sx={{ color: '#666', fontStyle: 'italic' }}>
-               Note: Only projects with complete data (truck load date, weeks to build, and skill hours) are included in the planning engine
-             </Typography>
-              <Typography variant="body2" sx={{ color: '#666', fontStyle: 'italic' }}>
-                Note: Capacity line now applies utilisation, date-range leave, contractor bookings, and company closures where data exists
-              </Typography>
-
+            </div>
+            <div className="meta">
+              <strong>Timeline:</strong> {startDate.format('DD/MM/YYYY')} to {endDate.format('DD/MM/YYYY')}
+            </div>
+            <div className="meta">
+              <strong>Demand Engine:</strong> Whiplash curve-based distribution
+            </div>
+            <div className="meta">
+              <strong>Projects Excluded (Incomplete Data):</strong> {projects.length - completeProjects.length}
+            </div>
+            <div className="meta" style={{ fontStyle: 'italic' }}>
+              Note: Only projects with complete data (truck load date, weeks to build, and skill hours) are included in the planning engine
+            </div>
+            <div className="meta" style={{ fontStyle: 'italic' }}>
+              Note: Capacity line now applies utilisation, date-range leave, contractor bookings, and company closures where data exists
+            </div>
           </Box>
         </CardContent>
       </Card>
