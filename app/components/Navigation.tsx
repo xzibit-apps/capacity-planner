@@ -90,6 +90,9 @@ export default function Navigation() {
               ))}
             </Box>
 
+            {/* Build version indicator */}
+            <BuildVersion />
+
             {/* Apps Home button */}
             <Box sx={{ ml: 2 }}>
               <a
@@ -128,5 +131,50 @@ export default function Navigation() {
         />
       )}
     </>
+  );
+}
+
+function BuildVersion() {
+  const sha = process.env.NEXT_PUBLIC_COMMIT_SHA || 'unknown';
+  const ref = process.env.NEXT_PUBLIC_COMMIT_REF || 'local';
+  const env = process.env.NEXT_PUBLIC_BUILD_ENV || 'local';
+  const shortSha = sha === 'unknown' ? 'unknown' : sha.slice(0, 7);
+  const commitUrl =
+    sha === 'unknown'
+      ? null
+      : `https://github.com/jnebauer/xzibit-capacity-planner/commit/${sha}`;
+  const label = env !== 'production' && env !== 'local' ? `${shortSha} · ${env}` : shortSha;
+
+  const chip = (
+    <span
+      style={{
+        fontFamily:
+          'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+        fontSize: '0.7rem',
+        color: 'rgba(255,255,255,0.7)',
+        background: 'rgba(0,0,0,0.15)',
+        border: '1px solid rgba(255,255,255,0.15)',
+        padding: '3px 8px',
+        borderRadius: '6px',
+        whiteSpace: 'nowrap',
+      }}
+      title={`commit ${sha}\nbranch ${ref}\nenv ${env}`}
+    >
+      {label}
+    </span>
+  );
+
+  if (!commitUrl) return <Box sx={{ ml: 2 }}>{chip}</Box>;
+  return (
+    <Box sx={{ ml: 2 }}>
+      <a
+        href={commitUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ textDecoration: 'none' }}
+      >
+        {chip}
+      </a>
+    </Box>
   );
 }
