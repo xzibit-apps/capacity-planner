@@ -1,0 +1,29 @@
+/* =========================================================
+   Capacity Planner — local component stylesheet
+
+   Composed from --xz-* tokens. Loaded from app/layout.tsx AFTER
+   the standards <link> so rules here win on source order.
+
+   Everything in this file is a candidate for upstreaming to the
+   Xzibit App Standard v1.1. Tag each block with a "TODO v1.1"
+   comment so we can batch them into a single standard PR later.
+
+   This file is an intentional stub in Pass 2 (theme wiring).
+   Populated in Pass 3 visual migration. Expected contents:
+
+     - .build-pill (SHA chip) — already shipped in Team Schedule
+       _local.css; align 1:1 here to avoid drift.
+     - .pill--muted — archived / historical status; not in the
+       standard's six-pastel family. Background surface-soft,
+       text ink-500.
+     - --xz-chart-skill-a through --xz-chart-skill-e — bespoke
+       5-slot chart palette for CNC / Build / Paint / AV /
+       Pack & Load demand series. Explicitly NOT reusing semantic
+       status colours for data series.
+     - --xz-chart-grid / --xz-chart-axis / --xz-chart-tooltip-bg
+       — Recharts chrome tokens (standard punts on chart chrome).
+     - .modal / .modal-head / .modal-body / .modal-actions — the
+       standard doesn't cover modals.
+     - DataGrid N-column / sticky-left variant (same need as
+       Team Schedule's .schedule-grid).
+   ========================================================= */

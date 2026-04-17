@@ -33,7 +33,10 @@ a {
   text-decoration: none;
 }
 
-/* Professional animations and effects */
+/* Keyframes retained for any components that still consume them;
+   !important component overrides that previously forced radii,
+   colours, and hover transforms have been deleted — those concerns
+   are now carried by lib/theme.ts (MUI ThemeProvider). */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -74,45 +77,6 @@ a {
   }
 }
 
-/* Apply animations to components */
-.MuiCard-root {
-  animation: fadeIn 0.3s ease-out;
-}
-
-.MuiButton-root {
-  animation: fadeIn 0.2s ease-out;
-}
-
-.MuiTab-root {
-  animation: slideIn 0.2s ease-out;
-}
-
-/* Enhanced hover effects */
-.MuiButton-root:hover {
-  transform: translateY(-1px) !important;
-  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.07), 0px 2px 4px rgba(0, 0, 0, 0.06) !important;
-}
-
-.MuiCard-root:hover {
-  transform: translateY(-1px) !important;
-  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.07), 0px 2px 4px rgba(0, 0, 0, 0.06) !important;
-}
-
-.MuiTab-root:hover {
-  transform: translateY(-1px) !important;
-  background-color: rgba(30, 64, 175, 0.04) !important;
-}
-
-.MuiChip-root:hover {
-  transform: translateY(-1px) !important;
-  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1) !important;
-}
-
-.MuiIconButton-root:hover {
-  transform: scale(1.1) !important;
-  background-color: rgba(30, 64, 175, 0.08) !important;
-}
-
 /* Professional scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -141,24 +105,6 @@ a {
   animation: shimmer 1.5s infinite;
 }
 
-/* Professional focus states */
-.MuiButton-root:focus-visible {
-  outline: 2px solid #1e40af;
-  outline-offset: 2px;
-}
-
-.MuiTab-root:focus-visible {
-  outline: 2px solid #1e40af;
-  outline-offset: 2px;
-}
-
-/* Enhanced typography */
-h1, h2, h3, h4, h5, h6 {
-  font-weight: 600;
-  color: #0f172a;
-  line-height: 1.2;
-}
-
 /* Professional spacing */
 .section-spacing {
   margin: 2rem 0;
@@ -173,50 +119,8 @@ h1, h2, h3, h4, h5, h6 {
   .section-spacing {
     margin: 1rem 0;
   }
-  
+
   .card-spacing {
     margin: 0.5rem 0;
   }
-}
-
-/* Force modern appearance */
-.MuiAppBar-root {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1), 0px 1px 2px rgba(0, 0, 0, 0.06) !important;
-  border-bottom: 1px solid #e2e8f0 !important;
-}
-
-.MuiTab-root {
-  color: #475569 !important;
-  font-weight: 500 !important;
-  text-transform: none !important;
-}
-
-.MuiTab-root.Mui-selected {
-  color: #1e40af !important;
-  font-weight: 600 !important;
-}
-
-.MuiTabs-indicator {
-  background-color: #1e40af !important;
-  height: 3px !important;
-}
-
-.MuiButton-root {
-  text-transform: none !important;
-  font-weight: 500 !important;
-  border-radius: 8px !important;
-}
-
-.MuiCard-root {
-  background-color: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 12px !important;
-}
-
-.MuiPaper-root {
-  background-color: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 12px !important;
 }
