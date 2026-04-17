@@ -77,11 +77,10 @@ function mapCurves(curves) {
     job_type: row.jobType,
     task_type: row.taskType,
     curve_type: row.curveType || null,
-    curve_status: row.curveStatus || 'Active',
+    curve_status: 'Draft',
     weekly_percentages: row.weeklyPercentages,
     description: row.description || null,
     derived_from: row.derivedFrom || null,
-    created_by: row.createdBy || null,
     curve_family: row.curveFamily || null,
     curve_parameters: row.curveParameters || null,
     domain_min: row.domainMin || null,
@@ -155,7 +154,7 @@ async function replaceTable(tableName, rows, sentinelColumn = 'id') {
   const { error: deleteError } = await supabase
     .from(tableName)
     .delete()
-    .neq(sentinelColumn, '00000000-0000-0000-0000-000000000000');
+    .not(sentinelColumn, 'is', null);
 
   if (deleteError && !String(deleteError.message || '').includes('0 rows')) {
     throw deleteError;

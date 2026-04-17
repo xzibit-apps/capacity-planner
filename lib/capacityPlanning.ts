@@ -370,9 +370,20 @@ export async function fetchPlanningCurves(): Promise<PlanningCurve[]> {
 
 export async function fetchCurveRegistry(): Promise<CurveRegistryEntry[]> {
   try {
-    const { data, error } = await supabase.from('cp_curve_registry').select('*');
-    if (!error && data && data.length > 0) {
-      return data.map((row: Record<string, unknown>) => normalizeCurveRegistryRow(row));
+    const { data: registryData, error: registryError } = await supabase.from('cp_curve_registry').select('*');
+    if (registryError) throw registryError;
+
+    if (registryData && registryData.length > 0) {
+      const { data: activeCurves } = await supabase
+        .from('cp_curves')
+        .select('curve_id')
+        .eq('curve_status', 'Active');
+      const activeCurveIds = new Set(
+        (activeCurves || []).map((row: Record<string, unknown>) => String(row.curve_id))
+      );
+      return registryData
+        .map((row: Record<string, unknown>) => normalizeCurveRegistryRow(row))
+        .filter((row) => activeCurveIds.has(row.defaultCurveId));
     }
   } catch {
     // Fallback handled below.
