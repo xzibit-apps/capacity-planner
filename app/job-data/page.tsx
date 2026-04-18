@@ -31,10 +31,37 @@ import {
   Button,
   Snackbar,
   Chip,
-  FormHelperText
+  FormHelperText,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, Visibility as VisibilityIcon, Upload as UploadIcon, Archive as ArchiveIcon } from '@mui/icons-material';
 import dayjs from 'dayjs';
+
+// Project status values in the DB are dirty — mixed case ("Quote Sent"
+// vs "quote sent"), trailing whitespace, nulls. Normalize here before
+// mapping to the standard's .pill variants.
+//   confirmed / completed / won / approved  → mint   (good / live)
+//   quote sent / quote in progress           → sky    (pencilled)
+//   tbq / production quote                   → amber  (at risk / pending)
+//   not progressing                          → coral  (blocked)
+//   null / unknown                           → muted  (neutral)
+// TODO follow-up: data-cleanup pass on cp_projects.status.
+function projectStatusPillClass(status: string | null | undefined): string {
+  const s = (status || '').trim().toLowerCase();
+  if (!s) return 'pill pill--muted';
+  if (['confirmed', 'completed', 'won', 'approved'].includes(s)) return 'pill pill--mint';
+  if (['quote sent', 'quote in progress'].includes(s)) return 'pill pill--sky';
+  if (['tbq', 'production quote'].includes(s)) return 'pill pill--amber';
+  if (s === 'not progressing') return 'pill pill--coral';
+  return 'pill pill--muted';
+}
+
+function probabilityPillClass(percent: number): string {
+  if (percent >= 80) return 'pill pill--mint';
+  if (percent >= 60) return 'pill pill--amber';
+  return 'pill pill--coral';
+}
 
 export default function JobData() {
   const queryClient = useQueryClient();
@@ -305,7 +332,7 @@ export default function JobData() {
         <Typography 
           variant="body2" 
           sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            color: hasEnoughData(params.row) ? 'inherit' : 'var(--xz-ink-400)',
             fontWeight: hasEnoughData(params.row) ? 500 : 400
           }}
         >
@@ -315,25 +342,25 @@ export default function JobData() {
     },
     {
       field: "jobName",
-      headerName: "Job Name",
+      headerName: "Job name",
       width: 250,
       editable: true,
       renderCell: (params) => (
         <Box
           sx={{
             cursor: 'pointer',
-            color: hasEnoughData(params.row) ? '#667eea' : '#9ca3af',
+            color: hasEnoughData(params.row) ? 'primary.main' : 'var(--xz-ink-400)',
             fontWeight: hasEnoughData(params.row) ? 500 : 400,
             '&:hover': {
               textDecoration: 'underline',
-              color: hasEnoughData(params.row) ? '#5a6fd8' : '#6b7280'
-            }
+              color: hasEnoughData(params.row) ? 'primary.dark' : 'var(--xz-ink-500)',
+            },
           }}
           onClick={() => {
             window.location.href = `/job-data/${params.row._id}`;
           }}
         >
-          {params.value || 'Unnamed Project'}
+          {params.value || 'Unnamed project'}
         </Box>
       ),
     },
@@ -345,12 +372,9 @@ export default function JobData() {
       type: "singleSelect",
       valueOptions: ["confirmed", "completed", "TBQ", "quote sent", "Quote in progress", "production quote", "won", "Not progressing", "approved"],
       renderCell: (params) => (
-        <Chip 
-          label={params.value || 'None'} 
-          size="small" 
-          variant="outlined"
-          color={params.value ? 'primary' : 'default'}
-        />
+        <span className={projectStatusPillClass(params.value)}>
+          {params.value || 'None'}
+        </span>
       ),
     },
 
@@ -372,7 +396,7 @@ export default function JobData() {
         <Typography 
           variant="body2" 
           sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            color: hasEnoughData(params.row) ? 'inherit' : 'var(--xz-ink-400)',
             fontWeight: hasEnoughData(params.row) ? 500 : 400
           }}
         >
@@ -390,7 +414,7 @@ export default function JobData() {
         <Typography 
           variant="body2" 
           sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            color: hasEnoughData(params.row) ? 'inherit' : 'var(--xz-ink-400)',
             fontWeight: hasEnoughData(params.row) ? 500 : 400
           }}
         >
@@ -414,12 +438,9 @@ export default function JobData() {
       renderCell: (params) => {
         const value = params.value || 0;
         return (
-          <Chip 
-            label={`${value.toFixed(0)}%`} 
-            size="small" 
-            color={value >= 80 ? 'success' : value >= 60 ? 'warning' : 'error'}
-            variant="outlined"
-          />
+          <span className={probabilityPillClass(value)}>
+            {`${value.toFixed(0)}%`}
+          </span>
         );
       },
     },
@@ -434,7 +455,7 @@ export default function JobData() {
         <Typography 
           variant="body2" 
           sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            color: hasEnoughData(params.row) ? 'inherit' : 'var(--xz-ink-400)',
             fontWeight: hasEnoughData(params.row) ? 500 : 400
           }}
         >
@@ -452,7 +473,7 @@ export default function JobData() {
         <Typography 
           variant="body2" 
           sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            color: hasEnoughData(params.row) ? 'inherit' : 'var(--xz-ink-400)',
             fontWeight: hasEnoughData(params.row) ? 500 : 400
           }}
         >
@@ -470,7 +491,7 @@ export default function JobData() {
         <Typography 
           variant="body2" 
           sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            color: hasEnoughData(params.row) ? 'inherit' : 'var(--xz-ink-400)',
             fontWeight: hasEnoughData(params.row) ? 500 : 400
           }}
         >
@@ -488,7 +509,7 @@ export default function JobData() {
         <Typography 
           variant="body2" 
           sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            color: hasEnoughData(params.row) ? 'inherit' : 'var(--xz-ink-400)',
             fontWeight: hasEnoughData(params.row) ? 500 : 400
           }}
         >
@@ -506,7 +527,7 @@ export default function JobData() {
         <Typography 
           variant="body2" 
           sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            color: hasEnoughData(params.row) ? 'inherit' : 'var(--xz-ink-400)',
             fontWeight: hasEnoughData(params.row) ? 500 : 400
           }}
         >
@@ -524,7 +545,7 @@ export default function JobData() {
         <Typography 
           variant="body2" 
           sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            color: hasEnoughData(params.row) ? 'inherit' : 'var(--xz-ink-400)',
             fontWeight: hasEnoughData(params.row) ? 500 : 400
           }}
         >
@@ -542,7 +563,7 @@ export default function JobData() {
         <Typography 
           variant="body2" 
           sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            color: hasEnoughData(params.row) ? 'inherit' : 'var(--xz-ink-400)',
             fontWeight: hasEnoughData(params.row) ? 500 : 400
           }}
         >
@@ -566,7 +587,7 @@ export default function JobData() {
         <Typography 
           variant="body2" 
           sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            color: hasEnoughData(params.row) ? 'inherit' : 'var(--xz-ink-400)',
             fontWeight: hasEnoughData(params.row) ? 500 : 400
           }}
         >
@@ -581,12 +602,9 @@ export default function JobData() {
       editable: true,
       type: "boolean",
       renderCell: (params) => (
-        <Chip 
-          label={params.value ? 'Yes' : 'No'} 
-          size="small" 
-          variant="outlined"
-          color={params.value ? 'warning' : 'default'}
-        />
+        <span className={params.value ? 'pill pill--amber' : 'pill pill--muted'}>
+          {params.value ? 'Yes' : 'No'}
+        </span>
       ),
     },
     {
@@ -599,7 +617,7 @@ export default function JobData() {
         <Typography 
           variant="body2" 
           sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            color: hasEnoughData(params.row) ? 'inherit' : 'var(--xz-ink-400)',
             fontWeight: hasEnoughData(params.row) ? 500 : 400
           }}
         >
@@ -617,7 +635,7 @@ export default function JobData() {
         <Typography 
           variant="body2" 
           sx={{ 
-            color: hasEnoughData(params.row) ? 'inherit' : '#9ca3af',
+            color: hasEnoughData(params.row) ? 'inherit' : 'var(--xz-ink-400)',
             fontWeight: hasEnoughData(params.row) ? 500 : 400,
             maxWidth: '280px',
             overflow: 'hidden',
@@ -706,132 +724,91 @@ export default function JobData() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Card sx={{ 
-        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-        borderRadius: 3,
-        transition: 'transform 0.2s ease-in-out',
-        '&:hover': { transform: 'translateY(-2px)' }
-      }}>
-        <CardContent sx={{ p: 3 }}>
+    <Box>
+      <Card>
+        <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h5" sx={{ fontWeight: 600 }}>
-              Project Management
+              Project management
             </Typography>
-            <Box sx={{ display: 'flex', gap: 2 }}>
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
               <Button
                 variant="outlined"
                 startIcon={isSyncing ? <CircularProgress size={18} /> : <UploadIcon />}
                 onClick={() => syncFromSheetsMutation.mutate()}
                 disabled={isSyncing}
-                sx={{
-                  borderColor: '#28a745',
-                  color: '#28a745',
-                  '&:hover': {
-                    borderColor: '#218838',
-                    backgroundColor: 'rgba(40, 167, 69, 0.08)'
-                  },
-                  '&:disabled': {
-                    borderColor: '#6c757d',
-                    color: '#6c757d'
-                  }
-                }}
               >
-                {isSyncing ? 'Syncing...' : 'Sync from Sheets'}
+                {isSyncing ? 'Syncing…' : 'Sync from Sheets'}
               </Button>
               <Button
                 variant="outlined"
                 startIcon={<UploadIcon />}
                 onClick={() => setCsvImportOpen(true)}
-                sx={{
-                  borderColor: '#667eea',
-                  color: '#667eea',
-                  '&:hover': {
-                    borderColor: '#5a6fd8',
-                    backgroundColor: 'rgba(102, 126, 234, 0.08)'
-                  }
-                }}
               >
                 Import CSV
               </Button>
-              <Button
-                variant="outlined"
-                startIcon={<ArchiveIcon />}
-                onClick={() => setShowArchived(!showArchived)}
-                sx={{
-                  borderColor: showArchived ? '#dc3545' : '#667eea',
-                  color: showArchived ? '#dc3545' : '#667eea',
-                  '&:hover': {
-                    borderColor: showArchived ? '#c82333' : '#5a6fd8',
-                    backgroundColor: showArchived ? 'rgba(220, 53, 69, 0.08)' : 'rgba(102, 126, 234, 0.08)'
-                  }
+              <ToggleButtonGroup
+                value={showArchived ? 'archived' : 'active'}
+                exclusive
+                size="small"
+                onChange={(_, value) => {
+                  if (value === 'active') setShowArchived(false);
+                  if (value === 'archived') setShowArchived(true);
                 }}
               >
-                {showArchived ? 'Show Active' : 'Show Archived'}
-              </Button>
+                <ToggleButton value="active">Active</ToggleButton>
+                <ToggleButton value="archived">Archived</ToggleButton>
+              </ToggleButtonGroup>
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={handleAddNew}
-                sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                  }
-                }}
               >
-                Add New Project
+                Add new project
               </Button>
             </Box>
           </Box>
-          
+
           {/* Status Summary */}
-          <Box sx={{ mb: 3, p: 2, backgroundColor: '#f8f9fa', borderRadius: 2, border: '1px solid #e9ecef' }}>
+          <Box sx={{
+            mb: 3,
+            p: 2,
+            backgroundColor: 'var(--xz-surface-soft)',
+            borderRadius: 2,
+            border: '1px solid var(--xz-hairline)',
+          }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" sx={{ color: '#495057', fontWeight: 600 }}>
-                Project Status Summary
+              <Typography variant="h6" sx={{ color: 'var(--xz-ink)', fontWeight: 600 }}>
+                Project status summary
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                <Chip 
-                  label="Sorted by Truck Load Date (Latest First)" 
-                  size="small" 
-                  color="primary" 
-                  variant="outlined"
-                  sx={{ fontSize: '0.75rem' }}
-                />
-                <Chip 
-                  label="Curve Selection moved to Dashboard" 
-                  size="small" 
-                  color="info" 
-                  variant="outlined"
-                  sx={{ fontSize: '0.75rem' }}
-                />
+                <span className="pill pill--sky">Sorted by truck load date (latest first)</span>
+                <span className="pill pill--lilac">Curve selection moved to dashboard</span>
               </Box>
             </Box>
             <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" sx={{ color: '#28a745', fontWeight: 700 }}>
+                <Typography variant="h4" sx={{ color: 'var(--xz-mint-700)', fontWeight: 700 }}>
                   {activeProjects.filter(hasEnoughData).length}
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#6c757d' }}>
-                  Active Projects (Complete Data)
+                <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>
+                  Active projects (complete data)
                 </Typography>
               </Box>
               <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" sx={{ color: '#ffc107', fontWeight: 700 }}>
+                <Typography variant="h4" sx={{ color: 'var(--xz-amber-700)', fontWeight: 700 }}>
                   {activeProjects.filter(p => !hasEnoughData(p)).length}
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#6c757d' }}>
-                  Active Projects (Incomplete Data)
+                <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>
+                  Active projects (incomplete data)
                 </Typography>
               </Box>
               <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" sx={{ color: '#6c757d', fontWeight: 700 }}>
+                <Typography variant="h4" sx={{ color: 'var(--xz-ink-500)', fontWeight: 700 }}>
                   {archivedProjects.length}
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#6c757d' }}>
-                  Archived Projects
+                <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>
+                  Archived projects
                 </Typography>
               </Box>
             </Box>
@@ -878,39 +855,18 @@ export default function JobData() {
                  }
                }}
               sx={{
-                border: "none",
-                "& .MuiDataGrid-cell": {
-                  borderBottom: "1px solid #e2e8f0",
+                '& .MuiDataGrid-row.Mui-selected': {
+                  backgroundColor: 'var(--xz-teal-50)',
                 },
-                "& .MuiDataGrid-columnHeaders": {
-                  backgroundColor: "#f8fafc",
-                  borderBottom: "2px solid #e2e8f0",
-                  color: "#374151",
-                  fontWeight: 600,
+                '& .MuiDataGrid-row.Mui-selected:hover': {
+                  backgroundColor: 'var(--xz-teal-50)',
                 },
-                "& .MuiDataGrid-row:hover": {
-                  backgroundColor: "#f1f5f9",
+                '& .incomplete-project': {
+                  backgroundColor: 'var(--xz-surface-soft)',
+                  color: 'var(--xz-ink-500)',
                 },
-                "& .MuiDataGrid-row.Mui-selected": {
-                  backgroundColor: "#dbeafe",
-                },
-                "& .MuiDataGrid-row.Mui-selected:hover": {
-                  backgroundColor: "#bfdbfe",
-                },
-                "& .MuiDataGrid-toolbarContainer": {
-                  backgroundColor: "#f8fafc",
-                  borderBottom: "1px solid #e2e8f0",
-                  padding: "8px 16px",
-                },
-                "& .incomplete-project": {
-                  backgroundColor: "#f8f9fa",
-                  color: "#6c757d",
-                  "&:hover": {
-                    backgroundColor: "#e9ecef",
-                  },
-                },
-                "& .incomplete-project .MuiDataGrid-cell": {
-                  color: "#6c757d",
+                '& .incomplete-project .MuiDataGrid-cell': {
+                  color: 'var(--xz-ink-500)',
                 },
               }}
             />
@@ -921,7 +877,7 @@ export default function JobData() {
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>
-          {editingProject?._id ? 'Edit Project' : 'Add New Project'}
+          {editingProject?._id ? 'Edit project' : 'Add new project'}
         </DialogTitle>
         <DialogContent>
           {editingProject && (
@@ -1074,36 +1030,35 @@ export default function JobData() {
          </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleSave} 
+          <Button
+            onClick={handleSave}
             variant="contained"
             disabled={isSaving}
-            sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-              }
-            }}
           >
-            {isSaving ? <><CircularProgress size={18} sx={{ mr: 1, color: 'white' }} /> Saving...</> : 'Save'}
+            {isSaving ? <><CircularProgress size={18} sx={{ mr: 1, color: 'inherit' }} /> Saving…</> : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* CSV Import Dialog */}
       <Dialog open={csvImportOpen} onClose={() => setCsvImportOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Import Projects from CSV</DialogTitle>
+        <DialogTitle>Import projects from CSV</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'grid', gap: 2, pt: 1 }}>
-                                       <Typography variant="body2" sx={{ color: '#6c757d', mb: 2 }}>
-                Upload a CSV file with project data. The file should include columns for:
-                Job Number, Job Name, Truck Load Date, Weeks to Build, Probability, CNC, Build, Paint, AV, Pack & Load, Trade Onsite, and Onsite Weeks.
-              </Typography>
+            <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)', mb: 2 }}>
+              Upload a CSV file with project data. The file should include columns for:
+              Job Number, Job Name, Truck Load Date, Weeks to Build, Probability, CNC, Build, Paint, AV, Pack & Load, Trade Onsite, and Onsite Weeks.
+            </Typography>
             <input
               type="file"
               accept=".csv"
               onChange={(e) => setCsvFile((e.target as HTMLInputElement).files?.[0] || null)}
-              style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+              style={{
+                width: '100%',
+                padding: '8px',
+                border: '1px solid var(--xz-hairline)',
+                borderRadius: 'var(--xz-r-sm)',
+              }}
             />
             <FormHelperText>
               Supported format: CSV with headers matching the project fields
@@ -1112,18 +1067,12 @@ export default function JobData() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCsvImportOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleCsvImport} 
+          <Button
+            onClick={handleCsvImport}
             variant="contained"
             disabled={!csvFile || csvImportMutation.isPending}
-            sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-              }
-            }}
           >
-            {csvImportMutation.isPending ? <><CircularProgress size={18} sx={{ mr: 1, color: 'white' }} /> Importing...</> : 'Import CSV'}
+            {csvImportMutation.isPending ? <><CircularProgress size={18} sx={{ mr: 1, color: 'inherit' }} /> Importing…</> : 'Import CSV'}
           </Button>
         </DialogActions>
       </Dialog>
