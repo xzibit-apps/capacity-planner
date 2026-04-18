@@ -131,11 +131,9 @@ export default function EmployeeView() {
 
   if (error || !employee) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">
-          Failed to load employee. Please try refreshing the page.
-        </Alert>
-      </Box>
+      <Alert severity="error">
+        Failed to load employee. Please try refreshing the page.
+      </Alert>
     );
   }
 
@@ -243,69 +241,54 @@ export default function EmployeeView() {
   const leaveTypes = ["Annual", "Sick", "Personal", "Holiday", "Other"];
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton onClick={handleBack} sx={{ color: '#667eea' }}>
+          <IconButton onClick={handleBack}>
             <ArrowBackIcon />
           </IconButton>
-          <Typography variant="h4" sx={{ fontWeight: 600, color: '#2c3e50' }}>
-            Employee Details
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>
+            Employee details
           </Typography>
         </Box>
-                 <Box sx={{ display: 'flex', gap: 2 }}>
-           <Button
-             variant="outlined"
-             startIcon={<EventIcon />}
-             onClick={() => setLeaveDialogOpen(true)}
-             sx={{
-               borderColor: '#667eea',
-               color: '#667eea',
-               '&:hover': {
-                 borderColor: '#5a6fd8',
-                 backgroundColor: 'rgba(102, 126, 234, 0.08)'
-               }
-             }}
-           >
-             Manage Leave
-           </Button>
-         </Box>
-             </Box>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<EventIcon />}
+            onClick={() => setLeaveDialogOpen(true)}
+          >
+            Manage leave
+          </Button>
+        </Box>
+      </Box>
 
-       {/* Leave Management Table */}
-       <Card sx={{ mb: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: 3 }}>
-         <CardContent sx={{ p: 3 }}>
-           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-             <Typography variant="h6" sx={{ fontWeight: 600, color: '#2c3e50' }}>
-               Leave Management
-             </Typography>
-             <Button
-               variant="contained"
-               startIcon={<AddIcon />}
-               onClick={() => setLeaveDialogOpen(true)}
-               sx={{
-                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                 color: 'white',
-                 '&:hover': {
-                   background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                 }
-               }}
-             >
-               Add Leave
-             </Button>
-           </Box>
+      {/* Leave Management Table */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Leave management
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setLeaveDialogOpen(true)}
+            >
+              Add leave
+            </Button>
+          </Box>
            
                        {employee?.leave && employee.leave.length > 0 ? (
               <TableContainer component={Paper} sx={{ maxHeight: 400, overflow: 'auto' }}>
                 <Table stickyHeader size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 600, backgroundColor: '#f8f9fa' }}>Date</TableCell>
-                      <TableCell sx={{ fontWeight: 600, backgroundColor: '#f8f9fa' }}>Leave Type</TableCell>
-                      <TableCell sx={{ fontWeight: 600, backgroundColor: '#f8f9fa' }}>Status</TableCell>
-                      <TableCell sx={{ fontWeight: 600, backgroundColor: '#f8f9fa' }}>Notes</TableCell>
-                      <TableCell sx={{ fontWeight: 600, backgroundColor: '#f8f9fa', width: 80 }}>Actions</TableCell>
+                      <TableCell sx={{ fontWeight: 600, backgroundColor: 'var(--xz-surface-soft)', color: 'var(--xz-ink-500)', fontSize: 12 }}>Date</TableCell>
+                      <TableCell sx={{ fontWeight: 600, backgroundColor: 'var(--xz-surface-soft)', color: 'var(--xz-ink-500)', fontSize: 12 }}>Leave type</TableCell>
+                      <TableCell sx={{ fontWeight: 600, backgroundColor: 'var(--xz-surface-soft)', color: 'var(--xz-ink-500)', fontSize: 12 }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 600, backgroundColor: 'var(--xz-surface-soft)', color: 'var(--xz-ink-500)', fontSize: 12 }}>Notes</TableCell>
+                      <TableCell sx={{ fontWeight: 600, backgroundColor: 'var(--xz-surface-soft)', color: 'var(--xz-ink-500)', fontSize: 12, width: 80 }}>Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -316,70 +299,46 @@ export default function EmployeeView() {
                         const isPast = leaveDate.isBefore(dayjs(), 'day');
                         const isToday = leaveDate.isSame(dayjs(), 'day');
                         
+                        const temporalPill = isPast
+                          ? 'pill pill--muted'
+                          : isToday
+                            ? 'pill pill--amber'
+                            : 'pill pill--sky';
                         return (
-                          <TableRow 
+                          <TableRow
                             key={index}
-                            sx={{ 
-                              backgroundColor: isPast ? '#fafafa' : 'inherit',
-                              '&:hover': { backgroundColor: isPast ? '#f5f5f5' : '#f8f9fa' }
+                            sx={{
+                              backgroundColor: isPast ? 'var(--xz-surface-soft)' : 'inherit',
+                              '&:hover': { backgroundColor: 'var(--xz-surface-soft)' },
                             }}
                           >
                             <TableCell>
-                              <Typography 
-                                variant="body2" 
-                                sx={{ 
+                              <Typography
+                                variant="body2"
+                                sx={{
                                   fontWeight: 500,
-                                  color: isPast ? '#9e9e9e' : '#2c3e50'
+                                  color: isPast ? 'var(--xz-ink-400)' : 'var(--xz-ink)',
                                 }}
                               >
                                 {leaveDate.format('DD/MM/YYYY')}
                               </Typography>
-                              <Typography variant="caption" sx={{ color: '#7f8c8d' }}>
+                              <Typography variant="caption" sx={{ color: 'var(--xz-ink-500)' }}>
                                 {leaveDate.isBefore(dayjs(), 'day') ? 'Past' : leaveDate.isSame(dayjs(), 'day') ? 'Today' : leaveDate.diff(dayjs(), 'day') + ' days from now'}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Chip 
-                                label={leaveItem.leaveType} 
-                                size="small" 
-                                color={isPast ? "default" : isToday ? "warning" : "primary"}
-                                variant="outlined"
-                              />
+                              <span className={temporalPill}>{leaveItem.leaveType}</span>
                             </TableCell>
                             <TableCell>
-                              {isPast && (
-                                <Chip 
-                                  label="Past" 
-                                  size="small" 
-                                  color="default" 
-                                  variant="outlined"
-                                  sx={{ fontSize: '0.7rem' }}
-                                />
-                              )}
-                              {isToday && (
-                                <Chip 
-                                  label="Today" 
-                                  size="small" 
-                                  color="warning" 
-                                  variant="outlined"
-                                  sx={{ fontSize: '0.7rem' }}
-                                />
-                              )}
-                              {!isPast && !isToday && (
-                                <Chip 
-                                  label="Upcoming" 
-                                  size="small" 
-                                  color="info" 
-                                  variant="outlined"
-                                  sx={{ fontSize: '0.7rem' }}
-                                />
-                              )}
+                              {isPast && <span className="pill pill--muted">Past</span>}
+                              {isToday && <span className="pill pill--amber">Today</span>}
+                              {!isPast && !isToday && <span className="pill pill--sky">Upcoming</span>}
                             </TableCell>
                             <TableCell>
                               <Typography 
                                 variant="body2" 
                                 sx={{ 
-                                  color: '#7f8c8d',
+                                  color: 'var(--xz-ink-500)',
                                   maxWidth: 200,
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
@@ -391,16 +350,12 @@ export default function EmployeeView() {
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <IconButton 
+                              <IconButton
                                 onClick={() => handleRemoveLeave(leaveItem.date)}
                                 color="error"
                                 size="small"
                                 disabled={isPast}
                                 title={isPast ? "Cannot remove past leave dates" : "Remove leave date"}
-                                sx={{ 
-                                  backgroundColor: 'rgba(255,255,255,0.8)',
-                                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.9)' }
-                                }}
                               >
                                 <RemoveIcon />
                               </IconButton>
@@ -411,103 +366,86 @@ export default function EmployeeView() {
                                      </TableBody>
                  </Table>
                  
-                 {/* Summary Row */}
-                 <Box sx={{ 
-                   p: 2, 
-                   backgroundColor: '#f8f9fa', 
-                   borderTop: '1px solid #e0e0e0',
-                   display: 'flex',
-                   justifyContent: 'space-between',
-                   alignItems: 'center'
-                 }}>
-                   <Box sx={{ display: 'flex', gap: 3 }}>
-                     <Typography variant="body2" sx={{ color: '#7f8c8d' }}>
-                       <strong>Total Leave Days:</strong> {employee.leave.length}
-                     </Typography>
-                     <Typography variant="body2" sx={{ color: '#7f8c8d' }}>
-                       <strong>Past:</strong> {employee.leave.filter((l: any) => dayjs(l.date).isBefore(dayjs(), 'day')).length}
-                     </Typography>
-                     <Typography variant="body2" sx={{ color: '#7f8c8d' }}>
-                       <strong>Upcoming:</strong> {employee.leave.filter((l: any) => dayjs(l.date).isAfter(dayjs(), 'day')).length}
-                     </Typography>
-                   </Box>
-                   <Typography variant="caption" sx={{ color: '#7f8c8d' }}>
-                     Hover over notes to see full text
-                   </Typography>
-                 </Box>
-               </TableContainer>
-           ) : (
-             <Box sx={{ textAlign: 'center', py: 4 }}>
-               <EventIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-               <Typography variant="h6" sx={{ color: 'text.secondary', mb: 1 }}>
-                 No Leave Days Scheduled
-               </Typography>
-               <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-                 This employee has no leave days scheduled. Click "Add Leave" to manage their availability.
-               </Typography>
-               <Button
-                 variant="outlined"
-                 startIcon={<AddIcon />}
-                 onClick={() => setLeaveDialogOpen(true)}
-                 sx={{
-                   borderColor: '#667eea',
-                   color: '#667eea',
-                   '&:hover': {
-                     borderColor: '#5a6fd8',
-                     backgroundColor: 'rgba(102, 126, 234, 0.08)'
-                   }
-                 }}
-               >
-                 Add First Leave Day
-               </Button>
-             </Box>
-           )}
-         </CardContent>
-       </Card>
+                {/* Summary Row */}
+                <Box sx={{
+                  p: 2,
+                  backgroundColor: 'var(--xz-surface-soft)',
+                  borderTop: '1px solid var(--xz-hairline)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}>
+                  <Box sx={{ display: 'flex', gap: 3 }}>
+                    <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>
+                      <strong>Total leave days:</strong> {employee.leave.length}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>
+                      <strong>Past:</strong> {employee.leave.filter((l: any) => dayjs(l.date).isBefore(dayjs(), 'day')).length}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>
+                      <strong>Upcoming:</strong> {employee.leave.filter((l: any) => dayjs(l.date).isAfter(dayjs(), 'day')).length}
+                    </Typography>
+                  </Box>
+                  <Typography variant="caption" sx={{ color: 'var(--xz-ink-500)' }}>
+                    Hover over notes to see full text
+                  </Typography>
+                </Box>
+              </TableContainer>
+          ) : (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <EventIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+              <Typography variant="h6" sx={{ color: 'text.secondary', mb: 1 }}>
+                No leave days scheduled
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+                This employee has no leave days scheduled. Click “Add leave” to manage their availability.
+              </Typography>
+              <Button
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={() => setLeaveDialogOpen(true)}
+              >
+                Add first leave day
+              </Button>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
 
-       {/* Employee Overview Card */}
-      <Card sx={{ mb: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: 3 }}>
-        <CardContent sx={{ p: 3 }}>
+      {/* Employee Overview Card */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3 }}>
             <Avatar
-              sx={{ 
-                width: 80, 
-                height: 80, 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                fontSize: '2rem'
+              sx={{
+                width: 80,
+                height: 80,
+                background: 'linear-gradient(135deg, var(--xz-teal) 0%, var(--xz-teal-600) 100%)',
+                fontSize: '2rem',
               }}
             >
               {employee.name ? employee.name.charAt(0).toUpperCase() : 'E'}
             </Avatar>
             <Box sx={{ flex: 1 }}>
-              <Typography variant="h5" sx={{ fontWeight: 600, color: '#2c3e50', mb: 1 }}>
-                {employee.name || 'Unnamed Employee'}
+              <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
+                {employee.name || 'Unnamed employee'}
               </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-                {employee.role && (
-                  <Chip 
-                    label={employee.role} 
-                    color="primary" 
-                    variant="outlined" 
-                    size="small"
-                  />
-                )}
-                {employee.department && (
-                  <Chip 
-                    label={employee.department} 
-                    color="secondary" 
-                    variant="outlined" 
-                    size="small"
-                  />
-                )}
-                <Chip 
-                  label={`${(employee.utilisation || 0.85) * 100}% Utilisation`}
-                  color={employee.utilisation >= 0.9 ? "success" : employee.utilisation >= 0.8 ? "warning" : "info"}
-                  variant="outlined" 
-                  size="small"
-                />
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2, alignItems: 'center' }}>
+                {employee.role && <span className="pill pill--sky">{employee.role}</span>}
+                {employee.department && <span className="pill pill--lilac">{employee.department}</span>}
+                <span
+                  className={
+                    employee.utilisation >= 0.9
+                      ? 'pill pill--mint'
+                      : employee.utilisation >= 0.8
+                        ? 'pill pill--amber'
+                        : 'pill pill--sky'
+                  }
+                >
+                  {`${(employee.utilisation || 0.85) * 100}% utilisation`}
+                </span>
               </Box>
-              <Typography variant="body1" sx={{ color: '#7f8c8d' }}>
+              <Typography variant="body1" sx={{ color: 'var(--xz-ink-500)' }}>
                 {employee.email || 'No email provided'}
               </Typography>
             </Box>
@@ -515,26 +453,26 @@ export default function EmployeeView() {
 
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
-              <Paper sx={{ p: 2.5, borderRadius: 2, backgroundColor: '#f8f9fa' }}>
-                <Typography variant="h6" sx={{ mb: 2, color: '#2c3e50', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Paper variant="outlined" sx={{ p: 2.5 }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
                   <ScheduleIcon color="primary" />
-                  Work Schedule
+                  Work schedule
                 </Typography>
                 <Box sx={{ display: 'grid', gap: 2 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: '#7f8c8d' }}>Daily Hours:</Typography>
+                    <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>Daily hours:</Typography>
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
                       {employee.dailyHours || 8} hours
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: '#7f8c8d' }}>Weekly Hours:</Typography>
+                    <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>Weekly hours:</Typography>
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
                       {(employee.dailyHours || 8) * 5} hours
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: '#7f8c8d' }}>Utilisation:</Typography>
+                    <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>Utilisation:</Typography>
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
                       {((employee.utilisation || 0.85) * 100).toFixed(0)}%
                     </Typography>
@@ -544,26 +482,26 @@ export default function EmployeeView() {
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <Paper sx={{ p: 2.5, borderRadius: 2, backgroundColor: '#f8f9fa' }}>
-                <Typography variant="h6" sx={{ mb: 2, color: '#2c3e50', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Paper variant="outlined" sx={{ p: 2.5 }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
                   <StarIcon color="primary" />
                   Performance
                 </Typography>
                 <Box sx={{ display: 'grid', gap: 2 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: '#7f8c8d' }}>Skills Count:</Typography>
+                    <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>Skills count:</Typography>
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
                       {employee.skills ? Object.keys(employee.skills).length : 0}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: '#7f8c8d' }}>Experience Level:</Typography>
+                    <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>Experience level:</Typography>
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
                       {employee.experienceLevel || 'Not specified'}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: '#7f8c8d' }}>Status:</Typography>
+                    <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>Status:</Typography>
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
                       {employee.status || 'Active'}
                     </Typography>
@@ -577,32 +515,27 @@ export default function EmployeeView() {
 
       {/* Skills Breakdown */}
       {employee.skills && Object.keys(employee.skills).length > 0 && (
-        <Card sx={{ mb: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: 3 }}>
-          <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ mb: 3, color: '#2c3e50', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
               <BuildIcon color="primary" />
-              Skills & Proficiency
+              Skills & proficiency
             </Typography>
             <Grid container spacing={2}>
-              {Object.entries(employee.skills).map(([skill, level]) => (
+              {Object.entries(employee.skills).map(([skill]) => (
                 <Grid item xs={12} sm={6} md={4} key={skill}>
-                  <Paper sx={{ 
-                    p: 2.5, 
-                    borderRadius: 2, 
-                    textAlign: 'center',
-                    backgroundColor: 'rgba(102, 126, 234, 0.08)',
-                    border: '1px solid rgba(102, 126, 234, 0.2)'
-                  }}>
-                    <Typography variant="h4" sx={{ color: '#667eea', fontWeight: 700, mb: 1 }}>
+                  <Paper variant="outlined" sx={{ p: 2.5, textAlign: 'center' }}>
+                    <Typography variant="h4" sx={{ color: 'var(--xz-teal)', fontWeight: 700, mb: 1 }}>
                       {skill}
                     </Typography>
-                    <Chip
-                      label={getSkillLevel(skill)}
-                      color={getSkillColor(skill)}
-                      size="small"
-                      sx={{ mb: 1 }}
-                    />
-                    <Typography variant="body2" sx={{ color: '#7f8c8d' }}>
+                    <span
+                      className={
+                        employee.skills?.[skill] ? 'pill pill--mint' : 'pill pill--muted'
+                      }
+                    >
+                      {getSkillLevel(skill)}
+                    </span>
+                    <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)', mt: 1 }}>
                       Available
                     </Typography>
                   </Paper>
@@ -613,23 +546,21 @@ export default function EmployeeView() {
         </Card>
       )}
 
-      
-
       {/* Future Sections Placeholder */}
-      <Card sx={{ boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: 3 }}>
-        <CardContent sx={{ p: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2, color: '#2c3e50', fontWeight: 600 }}>
-            Future Data Sections
+      <Card>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+            Future data sections
           </Typography>
-          <Typography variant="body2" sx={{ color: '#7f8c8d', mb: 2 }}>
+          <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)', mb: 2 }}>
             This page is designed to accommodate additional employee data in the future, such as:
           </Typography>
           <Box sx={{ display: 'grid', gap: 1 }}>
-            <Typography variant="body2" sx={{ color: '#7f8c8d' }}>• Performance reviews and ratings</Typography>
-            <Typography variant="body2" sx={{ color: '#7f8c8d' }}>• Training and certification history</Typography>
-            <Typography variant="body2" sx={{ color: '#7f8c8d' }}>• Project assignments and workload</Typography>
-            <Typography variant="body2" sx={{ color: '#7f8c8d' }}>• Salary and benefits information</Typography>
-            <Typography variant="body2" sx={{ color: '#7f8c8d' }}>• Attendance and time tracking</Typography>
+            <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>• Performance reviews and ratings</Typography>
+            <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>• Training and certification history</Typography>
+            <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>• Project assignments and workload</Typography>
+            <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>• Salary and benefits information</Typography>
+            <Typography variant="body2" sx={{ color: 'var(--xz-ink-500)' }}>• Attendance and time tracking</Typography>
           </Box>
         </CardContent>
       </Card>
@@ -639,7 +570,7 @@ export default function EmployeeView() {
         <DialogTitle>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h6">
-              Manage Leave - {employee?.name || 'Employee'}
+              Manage leave — {employee?.name || 'Employee'}
             </Typography>
           </Box>
         </DialogTitle>
@@ -647,54 +578,38 @@ export default function EmployeeView() {
           <Box sx={{ display: 'grid', gap: 3, pt: 1 }}>
             {/* Current Leave List */}
             <Box>
-              <Typography variant="h6" sx={{ mb: 2 }}>Current Leave Days</Typography>
+              <Typography variant="h6" sx={{ mb: 2 }}>Current leave days</Typography>
               {employee?.leave && employee.leave.length > 0 ? (
-                <List sx={{ bgcolor: '#f8f9fa', borderRadius: 1, maxHeight: 200, overflow: 'auto' }}>
+                <List sx={{ bgcolor: 'var(--xz-surface-soft)', borderRadius: 1, maxHeight: 200, overflow: 'auto' }}>
                   {employee.leave
                     .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
                     .map((leaveItem: any, index: number) => {
                       const leaveDate = dayjs(leaveItem.date);
                       const isPast = leaveDate.isBefore(dayjs(), 'day');
                       const isToday = leaveDate.isSame(dayjs(), 'day');
-                      
+                      const temporalPill = isPast
+                        ? 'pill pill--muted'
+                        : isToday
+                          ? 'pill pill--amber'
+                          : 'pill pill--sky';
+
                       return (
                         <ListItem key={index} divider>
                           <ListItemText
                             primary={
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Chip 
-                                  label={leaveItem.leaveType} 
-                                  size="small" 
-                                  color={isPast ? "default" : isToday ? "warning" : "primary"}
-                                  variant="outlined"
-                                />
-                                <Typography 
-                                  variant="body1" 
-                                  sx={{ 
+                                <span className={temporalPill}>{leaveItem.leaveType}</span>
+                                <Typography
+                                  variant="body1"
+                                  sx={{
                                     fontWeight: 500,
-                                    color: isPast ? 'text.secondary' : 'text.primary'
+                                    color: isPast ? 'text.secondary' : 'text.primary',
                                   }}
                                 >
                                   {leaveDate.format('DD/MM/YYYY')}
                                 </Typography>
-                                {isPast && (
-                                  <Chip 
-                                    label="Past" 
-                                    size="small" 
-                                    color="default" 
-                                    variant="outlined"
-                                    sx={{ fontSize: '0.7rem' }}
-                                  />
-                                )}
-                                {isToday && (
-                                  <Chip 
-                                    label="Today" 
-                                    size="small" 
-                                    color="warning" 
-                                    variant="outlined"
-                                    sx={{ fontSize: '0.7rem' }}
-                                  />
-                                )}
+                                {isPast && <span className="pill pill--muted">Past</span>}
+                                {isToday && <span className="pill pill--amber">Today</span>}
                               </Box>
                             }
                             secondary={
@@ -743,12 +658,12 @@ export default function EmployeeView() {
 
             {/* Add New Leave */}
             <Box>
-              <Typography variant="h6" sx={{ mb: 2 }}>Add Leave Range</Typography>
+              <Typography variant="h6" sx={{ mb: 2 }}>Add leave range</Typography>
               <Grid container spacing={2}>
                 <Grid item xs={12} md={3}>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
-                      label="Start Date"
+                      label="Start date"
                       format="DD/MM/YYYY"
                       value={newLeaveStartDate}
                       onChange={(date) => {
@@ -771,7 +686,7 @@ export default function EmployeeView() {
                 <Grid item xs={12} md={3}>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
-                      label="End Date"
+                      label="End date"
                       format="DD/MM/YYYY"
                       value={newLeaveEndDate}
                       onChange={(date) => {
@@ -793,11 +708,11 @@ export default function EmployeeView() {
                 </Grid>
                 <Grid item xs={12} md={3}>
                   <FormControl fullWidth size="small">
-                    <InputLabel>Leave Type</InputLabel>
+                    <InputLabel>Leave type</InputLabel>
                     <Select
                       value={newLeaveType}
                       onChange={(e) => setNewLeaveType(e.target.value)}
-                      label="Leave Type"
+                      label="Leave type"
                     >
                       {leaveTypes.map(type => (
                         <MenuItem key={type} value={type}>{type}</MenuItem>
@@ -807,7 +722,7 @@ export default function EmployeeView() {
                 </Grid>
                 <Grid item xs={12} md={3}>
                   <TextField
-                    label="Notes (Optional)"
+                    label="Notes (optional)"
                     value={newLeaveNotes}
                     onChange={(e) => setNewLeaveNotes(e.target.value)}
                     fullWidth
@@ -821,15 +736,8 @@ export default function EmployeeView() {
                   variant="contained"
                   onClick={handleAddLeave}
                   disabled={!newLeaveStartDate || !newLeaveEndDate}
-                  sx={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    '&:hover': {
-                      background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                    }
-                  }}
                 >
-                  Add Leave Range
+                  Add leave range
                 </Button>
                 <Typography variant="caption" color="text.secondary">
                   {newLeaveStartDate && newLeaveEndDate && newLeaveStartDate.isAfter(dayjs(), 'day') 

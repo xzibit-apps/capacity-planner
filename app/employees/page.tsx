@@ -466,14 +466,17 @@ export default function Employees() {
       renderCell: (params) => (
         <Button
           onClick={() => handleViewEmployee(params.id)}
+          variant="text"
           sx={{
             textTransform: 'none',
-            color: '#667eea',
+            color: 'primary.main',
             fontWeight: 500,
+            padding: 0,
+            minWidth: 'unset',
             '&:hover': {
               textDecoration: 'underline',
-              backgroundColor: 'transparent'
-            }
+              backgroundColor: 'transparent',
+            },
           }}
         >
           {params.value}
@@ -674,34 +677,22 @@ export default function Employees() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Card sx={{ 
-        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-        borderRadius: 3,
-        transition: 'transform 0.2s ease-in-out',
-        '&:hover': { transform: 'translateY(-2px)' }
-      }}>
-        <CardContent sx={{ p: 3 }}>
+    <Box>
+      <Card>
+        <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h5" sx={{ fontWeight: 600 }}>
-              Staff Management
+              Staff management
             </Typography>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
               onClick={handleAddNew}
-              sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                }
-              }}
             >
-              Add New Staff
+              Add new staff
             </Button>
           </Box>
-          
+
           <Box sx={{ height: "calc(100vh - 300px)", width: "100%" }}>
             <DataGrid
               rows={rows}
@@ -730,29 +721,11 @@ export default function Employees() {
                 },
               }}
               sx={{
-                border: "none",
-                "& .MuiDataGrid-cell": {
-                  borderBottom: "1px solid #e2e8f0",
+                '& .MuiDataGrid-row.Mui-selected': {
+                  backgroundColor: 'var(--xz-teal-50)',
                 },
-                "& .MuiDataGrid-columnHeaders": {
-                  backgroundColor: "#f8fafc",
-                  borderBottom: "2px solid #e2e8f0",
-                  color: "#374151",
-                  fontWeight: 600,
-                },
-                "& .MuiDataGrid-row:hover": {
-                  backgroundColor: "#f1f5f9",
-                },
-                "& .MuiDataGrid-row.Mui-selected": {
-                  backgroundColor: "#dbeafe",
-                },
-                "& .MuiDataGrid-row.Mui-selected:hover": {
-                  backgroundColor: "#bfdbfe",
-                },
-                "& .MuiDataGrid-toolbarContainer": {
-                  backgroundColor: "#f8fafc",
-                  borderBottom: "1px solid #e2e8f0",
-                  padding: "8px 16px",
+                '& .MuiDataGrid-row.Mui-selected:hover': {
+                  backgroundColor: 'var(--xz-teal-50)',
                 },
               }}
             />
@@ -763,7 +736,7 @@ export default function Employees() {
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>
-          {editingStaff?._id ? 'Edit Staff Member' : 'Add New Staff Member'}
+          {editingStaff?._id ? 'Edit staff member' : 'Add new staff member'}
         </DialogTitle>
         <DialogContent>
           {editingStaff && (
@@ -813,18 +786,12 @@ export default function Employees() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleSave} 
+          <Button
+            onClick={handleSave}
             variant="contained"
             disabled={isSaving}
-            sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-              }
-            }}
           >
-            {isSaving ? <><CircularProgress size={18} sx={{ mr: 1, color: 'white' }} /> Saving...</> : 'Save'}
+            {isSaving ? <><CircularProgress size={18} sx={{ mr: 1, color: 'inherit' }} /> Saving…</> : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -834,7 +801,7 @@ export default function Employees() {
         <DialogTitle>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h6">
-              Manage Leave - {selectedStaffForLeave?.name || 'Staff Member'}
+              Manage leave — {selectedStaffForLeave?.name || 'Staff member'}
             </Typography>
             <IconButton onClick={() => {
               setLeaveDialogOpen(false);
@@ -849,48 +816,40 @@ export default function Employees() {
             <Box sx={{ display: 'grid', gap: 3, pt: 1 }}>
               {/* Current Leave List */}
               <Box>
-                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                   <Typography variant="h6">Current Leave Days</Typography>
-                   {selectedStaffForLeave.leave && selectedStaffForLeave.leave.length > 0 && (
-                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                       <Button
-                         size="small"
-                         variant="outlined"
-                         onClick={handleSelectAllLeaves}
-                         disabled={bulkRemovalInProgress}
-                         sx={{ 
-                           fontSize: '0.75rem',
-                           minWidth: '120px',
-                           height: '32px'
-                         }}
-                       >
-                         {(() => {
-                           const futureLeaveDates = selectedStaffForLeave.leave.filter((leave: any) => dayjs(leave.date).isAfter(dayjs(), 'day'));
-                           const allFutureSelected = futureLeaveDates.length > 0 && futureLeaveDates.every((date: string) => selectedLeaveDates.includes(date));
-                           return allFutureSelected ? 'Deselect All' : 'Select All Future';
-                         })()}
-                       </Button>
-                       {selectedLeaveDates.length > 0 && (
-                         <Button
-                           size="small"
-                           variant="contained"
-                           color="error"
-                           onClick={handleBulkRemoveLeave}
-                           disabled={bulkRemovalInProgress}
-                           sx={{ 
-                             fontSize: '0.75rem',
-                             minWidth: '140px',
-                             height: '32px'
-                           }}
-                         >
-                           {bulkRemovalInProgress ? 'Removing...' : `Remove Selected (${selectedLeaveDates.length})`}
-                         </Button>
-                       )}
-                     </Box>
-                   )}
-                 </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">Current leave days</Typography>
+                  {selectedStaffForLeave.leave && selectedStaffForLeave.leave.length > 0 && (
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={handleSelectAllLeaves}
+                        disabled={bulkRemovalInProgress}
+                        sx={{ fontSize: '0.75rem', minWidth: '120px', height: '32px' }}
+                      >
+                        {(() => {
+                          const futureLeaveDates = selectedStaffForLeave.leave.filter((leave: any) => dayjs(leave.date).isAfter(dayjs(), 'day'));
+                          const allFutureSelected = futureLeaveDates.length > 0 && futureLeaveDates.every((date: string) => selectedLeaveDates.includes(date));
+                          return allFutureSelected ? 'Deselect all' : 'Select all future';
+                        })()}
+                      </Button>
+                      {selectedLeaveDates.length > 0 && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="error"
+                          onClick={handleBulkRemoveLeave}
+                          disabled={bulkRemovalInProgress}
+                          sx={{ fontSize: '0.75rem', minWidth: '140px', height: '32px' }}
+                        >
+                          {bulkRemovalInProgress ? 'Removing…' : `Remove selected (${selectedLeaveDates.length})`}
+                        </Button>
+                      )}
+                    </Box>
+                  )}
+                </Box>
                 {selectedStaffForLeave.leave && selectedStaffForLeave.leave.length > 0 ? (
-                  <List sx={{ bgcolor: '#f8f9fa', borderRadius: 1, maxHeight: 200, overflow: 'auto' }}>
+                  <List sx={{ bgcolor: 'var(--xz-surface-soft)', borderRadius: 1, maxHeight: 200, overflow: 'auto' }}>
                     {selectedStaffForLeave.leave
                       .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
                       .map((leaveItem: any, index: number) => {
@@ -898,64 +857,47 @@ export default function Employees() {
                         const isPast = leaveDate.isBefore(dayjs(), 'day');
                         const isToday = leaveDate.isSame(dayjs(), 'day');
                         const isSelected = selectedLeaveDates.includes(leaveItem.date);
-                        
-                                                 return (
-                           <ListItem 
-                             key={index} 
-                             divider
-                             sx={{
-                               display: 'flex',
-                               alignItems: 'center',
-                               py: 1,
-                               px: 2,
-                               '&:hover': {
-                                 backgroundColor: 'rgba(0, 0, 0, 0.04)'
-                               }
-                             }}
-                           >
-                             <Checkbox
-                               checked={isSelected}
-                               onChange={(e) => handleLeaveSelectionChange(leaveItem.date, e.target.checked)}
-                               disabled={isPast || bulkRemovalInProgress}
-                               sx={{ mr: 2 }}
-                               size="small"
-                             />
-                             <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
-                               <Chip 
-                                 label={leaveItem.leaveType} 
-                                 size="small" 
-                                 color={isPast ? "default" : isToday ? "warning" : "primary"}
-                                 variant="outlined"
-                                 sx={{ minWidth: '80px' }}
-                               />
-                               <Typography 
-                                 variant="body2" 
-                                 sx={{ 
-                                   fontWeight: 500,
-                                   color: isPast ? 'text.secondary' : 'text.primary',
-                                   minWidth: '100px'
-                                 }}
-                               >
-                                 {leaveDate.format('DD/MM/YYYY')}
-                               </Typography>
-                               {isPast && (
-                                 <Chip 
-                                   label="Past" 
-                                   size="small" 
-                                   color="default" 
-                                   variant="outlined"
-                                   sx={{ fontSize: '0.7rem', minWidth: '50px' }}
-                                 />
-                               )}
-                               {isToday && (
-                                 <Chip 
-                                   label="Today" 
-                                   size="small" 
-                                   color="warning" 
-                                   variant="outlined"
-                                   sx={{ fontSize: '0.7rem', minWidth: '50px' }}
-                                 />
-                               )}
+                        const temporalPill = isPast
+                          ? 'pill pill--muted'
+                          : isToday
+                            ? 'pill pill--amber'
+                            : 'pill pill--sky';
+
+                        return (
+                          <ListItem
+                            key={index}
+                            divider
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              py: 1,
+                              px: 2,
+                              '&:hover': { backgroundColor: 'var(--xz-surface-soft)' },
+                            }}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onChange={(e) => handleLeaveSelectionChange(leaveItem.date, e.target.checked)}
+                              disabled={isPast || bulkRemovalInProgress}
+                              sx={{ mr: 2 }}
+                              size="small"
+                            />
+                            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <span className={temporalPill} style={{ minWidth: 80, justifyContent: 'center' }}>
+                                {leaveItem.leaveType}
+                              </span>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 500,
+                                  color: isPast ? 'text.secondary' : 'text.primary',
+                                  minWidth: '100px',
+                                }}
+                              >
+                                {leaveDate.format('DD/MM/YYYY')}
+                              </Typography>
+                              {isPast && <span className="pill pill--muted">Past</span>}
+                              {isToday && <span className="pill pill--amber">Today</span>}
                                {leaveItem.notes && (
                                  <Typography 
                                    variant="body2" 
@@ -1000,41 +942,41 @@ export default function Employees() {
                          );
                       })}
                   </List>
-                                 ) : (
-                   <Box sx={{ 
-                     textAlign: 'center', 
-                     py: 4,
-                     px: 2,
-                     border: '2px dashed #e0e0e0',
-                     borderRadius: 2,
-                     backgroundColor: '#fafafa'
-                   }}>
-                     <EventIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
-                     <Typography variant="body1" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
-                       No leave days scheduled
-                     </Typography>
-                     <Typography variant="body2" color="text.secondary">
-                       Add leave dates below to manage staff availability
-                     </Typography>
-                   </Box>
-                 )}
+                ) : (
+                  <Box sx={{
+                    textAlign: 'center',
+                    py: 4,
+                    px: 2,
+                    border: '1.5px dashed var(--xz-ink-300)',
+                    borderRadius: 2,
+                    backgroundColor: 'var(--xz-surface-soft)',
+                  }}>
+                    <EventIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                    <Typography variant="body1" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
+                      No leave days scheduled
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Add leave dates below to manage staff availability
+                    </Typography>
+                  </Box>
+                )}
               </Box>
 
               <Divider />
 
               {/* Add New Leave */}
-              <Box sx={{ 
-                backgroundColor: '#f8f9fa', 
-                p: 3, 
+              <Box sx={{
+                backgroundColor: 'var(--xz-surface-soft)',
+                p: 3,
                 borderRadius: 2,
-                border: '1px solid #e9ecef'
+                border: '1px solid var(--xz-hairline)',
               }}>
-                <Typography variant="h6" sx={{ mb: 3, color: 'text.primary' }}>Add Leave Range</Typography>
-                                 <Grid container spacing={3}>
-                   <Grid item xs={12} md={4}>
-                     <LocalizationProvider dateAdapter={AdapterDayjs}>
-                       <DatePicker
-                         label="Start Date"
+                <Typography variant="h6" sx={{ mb: 3, color: 'text.primary' }}>Add leave range</Typography>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={4}>
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <DatePicker
+                        label="Start date"
                          value={newLeaveStartDate}
                          onChange={(date) => setNewLeaveStartDate(date)}
                          format="DD/MM/YYYY"
@@ -1059,9 +1001,9 @@ export default function Employees() {
                      </LocalizationProvider>
                    </Grid>
                    <Grid item xs={12} md={4}>
-                     <LocalizationProvider dateAdapter={AdapterDayjs}>
-                       <DatePicker
-                         label="End Date"
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <DatePicker
+                        label="End date"
                          value={newLeaveEndDate}
                          onChange={(date) => setNewLeaveEndDate(date)}
                          format="DD/MM/YYYY"
@@ -1086,13 +1028,13 @@ export default function Employees() {
                      </LocalizationProvider>
                    </Grid>
                    <Grid item xs={12} md={4}>
-                     <FormControl fullWidth size="medium">
-                       <InputLabel>Leave Type</InputLabel>
-                       <Select
-                         value={newLeaveType}
-                         onChange={(e) => setNewLeaveType(e.target.value)}
-                         label="Leave Type"
-                       >
+                    <FormControl fullWidth size="medium">
+                      <InputLabel>Leave type</InputLabel>
+                      <Select
+                        value={newLeaveType}
+                        onChange={(e) => setNewLeaveType(e.target.value)}
+                        label="Leave type"
+                      >
                          {leaveTypes.map(type => (
                            <MenuItem key={type} value={type}>{type}</MenuItem>
                          ))}
@@ -1102,8 +1044,8 @@ export default function Employees() {
                  </Grid>
                  <Grid container spacing={3} sx={{ mt: 1 }}>
                    <Grid item xs={12} md={6}>
-                     <TextField
-                       label="Notes (Optional)"
+                    <TextField
+                      label="Notes (optional)"
                        value={newLeaveNotes}
                        onChange={(e) => setNewLeaveNotes(e.target.value)}
                        fullWidth
@@ -1118,24 +1060,15 @@ export default function Employees() {
                     onClick={handleAddLeave}
                     disabled={!newLeaveStartDate || !newLeaveEndDate}
                     size="large"
-                    sx={{
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      color: 'white',
-                      px: 3,
-                      py: 1.5,
-                      '&:hover': {
-                        background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                      }
-                    }}
                   >
-                    Add Leave Range
+                    Add leave range
                   </Button>
-                  <Box sx={{ 
-                    backgroundColor: 'white', 
-                    px: 2, 
-                    py: 1, 
+                  <Box sx={{
+                    backgroundColor: 'var(--xz-surface)',
+                    px: 2,
+                    py: 1,
                     borderRadius: 1,
-                    border: '1px solid #e9ecef'
+                    border: '1px solid var(--xz-hairline)',
                   }}>
                     <Typography variant="body2" color="text.secondary">
                       {newLeaveStartDate && newLeaveEndDate && newLeaveStartDate.isAfter(dayjs(), 'day') 
