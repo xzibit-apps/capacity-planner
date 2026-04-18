@@ -81,3 +81,29 @@
   --xz-chart-skill-d: #F59E0B;  /* AV         — amber-500  */
   --xz-chart-skill-e: #14B8A6;  /* Pack&Load  — teal-500   */
 }
+
+/* =========================================================
+   .pill--muted — archived / historical / neutral status.
+   The standard ships six status pills (mint/sky/amber/coral/
+   lilac/sun). "Archived" does not map cleanly to any of them
+   (it is neither good, bad, at-risk, nor creative — it is
+   simply inactive), so we compose a seventh variant locally:
+   surface-soft fill, ink-500 text, hairline border.
+   TODO v1.1: upstream .pill--muted to the Xzibit App Standard.
+   ========================================================= */
+.pill--muted {
+  background: var(--xz-surface-soft);
+  color: var(--xz-ink-500);
+  border: 1px solid var(--xz-hairline);
+}
+
+/* =========================================================
+   TODO v1.1: standard should ship an official MuiToggleButton
+   → .tabs recipe. The MUI theme in lib/theme.ts composes this
+   (MuiToggleButtonGroup pill-bordered wrapper + MuiToggleButton
+   .Mui-selected → ink fill / white text) to match the
+   standard's .tabs / .tab.is-active aesthetic. Leaves two
+   parallel ways to express the same tab pattern (the
+   standard's .tabs + .tab.is-active classes, or MUI's
+   ToggleButtonGroup theme) — which isn't ideal long-term.
+   ========================================================= */
