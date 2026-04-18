@@ -8,7 +8,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Container,
   Dialog,
   DialogActions,
   DialogContent,
@@ -72,6 +71,25 @@ const STATUS_COLOR: Record<string, 'warning' | 'success' | 'default'> = {
   Archived: 'default',
 };
 
+// Curve status → standard .pill variant. Mapping per audit §7:
+//   Draft    → pill--sky   (pencilled / not yet live)
+//   Active   → pill--mint  (confirmed / live)
+//   Archived → pill--muted (historical; composed locally in
+//                           app/local.css — the standard's
+//                           six-pastel family has no neutral)
+function statusPillClass(status: string): string {
+  switch (status) {
+    case 'Active':
+      return 'pill pill--mint';
+    case 'Draft':
+      return 'pill pill--sky';
+    case 'Archived':
+      return 'pill pill--muted';
+    default:
+      return 'pill pill--muted';
+  }
+}
+
 async function fetchCurves(): Promise<CurvesResponse> {
   const res = await fetch('/api/curves', { cache: 'no-store' });
   if (!res.ok) throw new Error('Failed to load curves');
@@ -122,24 +140,20 @@ export default function CurveReviewPage() {
 
   if (isLoading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 6, textAlign: 'center' }}>
+      <Box sx={{ py: 6, textAlign: 'center' }}>
         <CircularProgress />
-      </Container>
+      </Box>
     );
   }
 
   if (error) {
-    return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Alert severity="error">{(error as Error).message}</Alert>
-      </Container>
-    );
+    return <Alert severity="error">{(error as Error).message}</Alert>;
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+    <>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-        <Typography variant="h4">Curve Review</Typography>
+        <Typography variant="h4">Curve review</Typography>
         <Typography variant="body2" color="text.secondary">
           {data?.total ?? 0} total · {counts.Draft ?? 0} Draft · {counts.Active ?? 0} Active ·{' '}
           {counts.Archived ?? 0} Archived
@@ -166,11 +180,29 @@ export default function CurveReviewPage() {
         <ToggleButton value="Archived">Archived</ToggleButton>
       </ToggleButtonGroup>
 
-      <Paper variant="outlined">
+      <Paper
+        variant="outlined"
+        sx={{
+          overflow: 'hidden',
+          '& .MuiTableHead-root .MuiTableCell-root': {
+            backgroundColor: 'var(--xz-surface-soft)',
+            color: 'var(--xz-ink-500)',
+            fontWeight: 600,
+            fontSize: 12,
+            borderBottom: '1px solid var(--xz-hairline)',
+          },
+          '& .MuiTableCell-root': {
+            borderBottomColor: 'var(--xz-hairline-soft)',
+          },
+          '& .MuiTableBody-root .MuiTableRow-root:hover': {
+            backgroundColor: 'var(--xz-surface-soft)',
+          },
+        }}
+      >
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Job Type</TableCell>
+              <TableCell>Job type</TableCell>
               <TableCell>Task</TableCell>
               <TableCell>Curve ID</TableCell>
               <TableCell>Version</TableCell>
@@ -189,11 +221,9 @@ export default function CurveReviewPage() {
                 </TableCell>
                 <TableCell>{curve.version}</TableCell>
                 <TableCell>
-                  <Chip
-                    label={curve.curveStatus}
-                    color={STATUS_COLOR[curve.curveStatus] ?? 'default'}
-                    size="small"
-                  />
+                  <span className={statusPillClass(curve.curveStatus)}>
+                    {curve.curveStatus}
+                  </span>
                 </TableCell>
                 <TableCell>{curve.isRegistryDefault ? 'Yes' : '—'}</TableCell>
                 <TableCell align="right">
@@ -223,7 +253,7 @@ export default function CurveReviewPage() {
         busy={mutation.isPending}
         errorMessage={mutation.error ? (mutation.error as Error).message : null}
       />
-    </Container>
+    </>
   );
 }
 
