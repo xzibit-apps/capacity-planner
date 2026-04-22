@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  fetchCompanyClosures,
+  fetchMergedClosures,
   fetchPlanningStaff,
   getDateFromISOWeek,
   getWeekRange,
@@ -15,9 +15,12 @@ export async function GET(request: NextRequest) {
     const startDate = toDate(searchParams.get('startDate')) || new Date();
     const endDate = toDate(searchParams.get('endDate')) || new Date(new Date().setMonth(new Date().getMonth() + 12));
 
+    const jurisdictionParam = searchParams.get('jurisdiction') || 'national';
+    const jurisdictions = jurisdictionParam.split(',').map((j) => j.trim()).filter(Boolean);
+
     const [staff, closures] = await Promise.all([
       fetchPlanningStaff(),
-      fetchCompanyClosures(),
+      fetchMergedClosures(jurisdictions),
     ]);
 
     const weeklyCapacity = calculateWeeklyCapacity(staff, closures, startDate, endDate);
@@ -40,6 +43,7 @@ export async function GET(request: NextRequest) {
       meta: {
         staffCount: staff.length,
         closureCount: closures.length,
+        jurisdictions,
       },
     });
   } catch (error: any) {

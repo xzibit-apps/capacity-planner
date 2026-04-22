@@ -42,15 +42,20 @@ export interface CurveRegistryEntry {
   reason?: string | null;
 }
 
+export type TruckLoadDateConfidence = 'iso' | 'day_mon_year' | 'mon_year_assumed_mid' | 'unparseable' | null;
+
 export interface PlanningProject {
   id: string;
   jobNumber: string;
   jobName: string;
-  jobType: string;
+  jobType: string | null;
   probability: number;
   workshopStartDate: Date | null;
   weeksInWorkshop: number;
   truckLoadDate: Date | null;
+  truckLoadDateConfidence?: TruckLoadDateConfidence;
+  probabilityWasCoerced?: boolean;
+  probabilityWasAmbiguous?: boolean;
   onsiteWeeks: number;
   cnc: number;
   build: number;
@@ -135,6 +140,102 @@ export function toDate(value: unknown): Date | null {
   return date;
 }
 
+const MONTH_NAMES: Record<string, number> = {
+  jan: 0, january: 0,
+  feb: 1, february: 1,
+  mar: 2, march: 2,
+  apr: 3, april: 3,
+  may: 4,
+  jun: 5, june: 5,
+  jul: 6, july: 6,
+  aug: 7, august: 7,
+  sep: 8, september: 8,
+  oct: 9, october: 9,
+  nov: 10, november: 10,
+  dec: 11, december: 11,
+};
+
+function parseLegacyTruckDate(text: string): { date: Date | null; confidence: TruckLoadDateConfidence } {
+  const trimmed = text.trim();
+  if (!trimmed) return { date: null, confidence: null };
+
+  // ISO: YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const d = new Date(trimmed + 'T00:00:00Z');
+    return Number.isNaN(d.getTime()) ? { date: null, confidence: 'unparseable' } : { date: d, confidence: 'iso' };
+  }
+
+  // DD Mon YYYY or D Mon YYYY
+  const dayMonYear = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+  if (dayMonYear) {
+    const day = parseInt(dayMonYear[1], 10);
+    const monthIdx = MONTH_NAMES[dayMonYear[2].toLowerCase()];
+    const year = parseInt(dayMonYear[3], 10);
+    if (monthIdx !== undefined) {
+      const d = new Date(Date.UTC(year, monthIdx, day));
+      return { date: d, confidence: 'day_mon_year' };
+    }
+  }
+
+  // Mon YYYY (assume mid-month: 15th)
+  const monYear = trimmed.match(/^([A-Za-z]+)\s+(\d{4})$/);
+  if (monYear) {
+    const monthIdx = MONTH_NAMES[monYear[1].toLowerCase()];
+    const year = parseInt(monYear[2], 10);
+    if (monthIdx !== undefined) {
+      const d = new Date(Date.UTC(year, monthIdx, 15));
+      return { date: d, confidence: 'mon_year_assumed_mid' };
+    }
+  }
+
+  return { date: null, confidence: 'unparseable' };
+}
+
+export function normaliseProbability(raw: number | string | null): { value: number; wasCoerced: boolean; wasAmbiguous: boolean } {
+  if (raw === null || raw === undefined) {
+    return { value: 0, wasCoerced: false, wasAmbiguous: false };
+  }
+
+  const numeric = typeof raw === 'string' ? parseFloat(raw) : raw;
+  if (!Number.isFinite(numeric)) {
+    return { value: 0, wasCoerced: false, wasAmbiguous: false };
+  }
+
+  if (numeric === 1) {
+    // Ambiguous: could be 1% or 100%
+    return { value: 1, wasCoerced: false, wasAmbiguous: true };
+  }
+
+  if (numeric > 0 && numeric <= 1) {
+    return { value: numeric * 100, wasCoerced: true, wasAmbiguous: false };
+  }
+
+  return { value: Math.min(Math.max(numeric, 0), 100), wasCoerced: false, wasAmbiguous: false };
+}
+
+export function parseTruckLoadDate(
+  parsedColumn: string | Date | null,
+  legacyText: string | null
+): { date: Date | null; confidence: TruckLoadDateConfidence } {
+  if (parsedColumn) {
+    const d = parsedColumn instanceof Date ? parsedColumn : new Date(parsedColumn + 'T00:00:00Z');
+    if (!Number.isNaN(d.getTime())) {
+      return { date: d, confidence: null };
+    }
+  }
+  if (!legacyText) return { date: null, confidence: null };
+  return parseLegacyTruckDate(legacyText);
+}
+
+export function deriveWorkshopStartDate(truckLoadDate: Date, weeksToBuild: number, onsiteWeeks: number): Date | null {
+  if (weeksToBuild <= 0 || onsiteWeeks < 0) return null;
+  const totalWeeksBack = weeksToBuild + onsiteWeeks;
+  if (totalWeeksBack <= 0) return null;
+  const result = new Date(truckLoadDate);
+  result.setUTCDate(result.getUTCDate() - totalWeeksBack * 7);
+  return startOfIsoWeek(result);
+}
+
 export function toDateString(value: Date | string): string {
   const date = value instanceof Date ? value : new Date(value);
   return date.toISOString().split('T')[0];
@@ -186,7 +287,7 @@ export function getWeekRange(startDate: Date, endDate: Date): string[] {
   return weeks;
 }
 
-export function deriveWorkshopStartDate(projectRow: Record<string, unknown>): Date | null {
+function deriveWorkshopStartDateFromRow(projectRow: Record<string, unknown>): Date | null {
   const explicitWorkshopStart =
     toDate(projectRow.workshop_start_date) ||
     toDate(projectRow.workshopStartDate);
@@ -210,14 +311,28 @@ export function normalizeProjectRow(
   row: Record<string, unknown>,
   jobTypeNameById: Record<string, string>
 ): PlanningProject {
-  const jobTypeId = String(row.job_type_mongo_id ?? row.jobType ?? row.job_type ?? '');
+  // job_type: prefer the denormalised text column, fall back to lookup by mongo_id
+  const denormJobType = row.job_type ? String(row.job_type).trim() : null;
+  const jobTypeId = String(row.job_type_mongo_id ?? '');
   const jobTypeName =
+    denormJobType ||
     jobTypeNameById[jobTypeId] ||
-    String(row.job_type_name ?? row.jobTypeName ?? row.job_type ?? jobTypeId ?? '').trim();
+    String(row.job_type_name ?? row.jobTypeName ?? jobTypeId).trim() ||
+    null;
 
-  const weeksInWorkshop = Math.max(
-    1,
-    Math.round(asNumber(row.weeks_in_workshop ?? row.weeks_to_build ?? row.weeksInWorkshop ?? row.weeksToBuild ?? 1))
+  const rawWeeks = asNumber(row.weeks_in_workshop ?? row.weeks_to_build ?? row.weeksInWorkshop ?? row.weeksToBuild ?? 0);
+  const weeksInWorkshop = rawWeeks > 0 ? Math.round(rawWeeks) : 0;
+
+  // truck date: prefer parsed DB column, fall back to legacy text parsing
+  const { date: truckLoadDate, confidence: truckLoadDateConfidence } = parseTruckLoadDate(
+    (row.truck_load_date_parsed as string | Date | null) ?? null,
+    (row.truck_load_date as string | null) ?? (row.truckLoadDate as string | null) ?? null
+  );
+
+  // probability normalisation
+  const probRaw = row.probability ?? row.probabilityRaw ?? 0;
+  const { value: probability, wasCoerced: probabilityWasCoerced, wasAmbiguous: probabilityWasAmbiguous } = normaliseProbability(
+    probRaw as number | string | null
   );
 
   return {
@@ -225,10 +340,13 @@ export function normalizeProjectRow(
     jobNumber: String(row.job_number ?? row.jobNumber ?? ''),
     jobName: String(row.job_name ?? row.jobName ?? ''),
     jobType: jobTypeName,
-    probability: normalizeUtilisation(asNumber(row.probability ?? 0)) * 100,
-    workshopStartDate: deriveWorkshopStartDate(row),
+    probability,
+    probabilityWasCoerced,
+    probabilityWasAmbiguous,
+    workshopStartDate: deriveWorkshopStartDateFromRow(row),
     weeksInWorkshop,
-    truckLoadDate: toDate(row.truck_load_date ?? row.truckLoadDate),
+    truckLoadDate,
+    truckLoadDateConfidence,
     onsiteWeeks: Math.max(1, Math.round(asNumber(row.onsite_weeks ?? row.onsiteWeeks ?? 1))),
     cnc: asNumber(row.cnc),
     build: asNumber(row.build),
@@ -429,6 +547,44 @@ export async function fetchCompanyClosures(): Promise<CompanyClosure[]> {
   } catch {
     return [];
   }
+}
+
+export async function fetchSharedCompanyClosures(
+  jurisdictions: string[] = ['national']
+): Promise<CompanyClosure[]> {
+  try {
+    const { data, error } = await supabase
+      .from('company_closures')
+      .select('*')
+      .in('jurisdiction', jurisdictions)
+      .or('active.is.null,active.eq.true')
+      .order('date', { ascending: true });
+    if (error || !data) return [];
+
+    return data.map((row: Record<string, unknown>) => {
+      const dateStr = String(row.date ?? row.start_date ?? '');
+      return {
+        id: row.id ? String(row.id) : undefined,
+        name: String(row.name ?? row.description ?? 'Public Holiday'),
+        startDate: dateStr,
+        endDate: dateStr,
+        closureType: String(row.closure_type ?? row.closureType ?? 'Public Holiday'),
+        notes: row.notes ? String(row.notes) : null,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchMergedClosures(
+  jurisdictions: string[] = ['national']
+): Promise<CompanyClosure[]> {
+  const [shared, workshop] = await Promise.all([
+    fetchSharedCompanyClosures(jurisdictions),
+    fetchCompanyClosures(),
+  ]);
+  return [...shared, ...workshop];
 }
 
 export function createEmptyWeeklyDemand(weeks: string[]): WeeklyDemandBreakdown {

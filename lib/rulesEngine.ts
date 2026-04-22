@@ -12,6 +12,7 @@ import {
 export interface CurveSelection {
   curve: PlanningCurve;
   isDefault: boolean;
+  reason?: string;
 }
 
 export interface CurveCache {
@@ -24,8 +25,17 @@ export interface TaskDemandResult {
   totalHours: number;
   curveId: string;
   curveVersion: string;
+  curveReason?: string;
   weeklyDemand: Record<string, number>;
 }
+
+export type ProjectWarningTag =
+  | 'missing_truck_date'
+  | 'zero_weeks_to_build'
+  | 'job_type_missing'
+  | 'job_type_no_curves'
+  | 'ambiguous_probability'
+  | 'flat_fallback';
 
 export interface ProjectDemandResult {
   projectId: string;
@@ -34,6 +44,7 @@ export interface ProjectDemandResult {
   probability: number;
   taskDemands: TaskDemandResult[];
   breakdown: WeeklyDemandBreakdown;
+  warnings: ProjectWarningTag[];
 }
 
 interface ParsedCurveData {
@@ -135,7 +146,7 @@ export function selectCurve(
     }
   }
 
-  return { curve: createFlatCurve(taskType, jobType), isDefault: true };
+  return { curve: createFlatCurve(taskType, jobType), isDefault: false, reason: 'flat-fallback-no-curve' };
 }
 
 export function calculateTaskDemand(
@@ -209,31 +220,53 @@ export function calculateProjectDemand(
   project: PlanningProject,
   cache: CurveCache,
   planningWeeks: string[]
-): ProjectDemandResult | null {
-  if (!project.workshopStartDate || project.weeksInWorkshop <= 0 || !project.jobType) {
-    return null;
+): ProjectDemandResult {
+  const warnings: ProjectWarningTag[] = [];
+
+  if (!project.truckLoadDate) warnings.push('missing_truck_date');
+  if (project.weeksInWorkshop <= 0) warnings.push('zero_weeks_to_build');
+  if (!project.jobType) {
+    warnings.push('job_type_missing');
+  } else {
+    // Check if any task has a real curve in the registry for this job type
+    const hasAnyCurve = CORE_TASK_FIELD_MAP.some(({ taskType }) =>
+      cache.registryByJobAndTask.has(`${project.jobType}|${taskType}`)
+    );
+    if (!hasAnyCurve) warnings.push('job_type_no_curves');
+  }
+  if (project.probabilityWasAmbiguous) {
+    warnings.push('ambiguous_probability');
   }
 
   const breakdown = createEmptyWeeklyDemand(planningWeeks);
   const taskDemands: TaskDemandResult[] = [];
 
-  CORE_TASK_FIELD_MAP.forEach(({ taskType, projectField }) => {
-    const totalHours = Number(project[projectField] || 0);
-    if (totalHours <= 0) return;
+  if (project.workshopStartDate && project.weeksInWorkshop > 0 && project.jobType) {
+    let anyFlatFallback = false;
 
-    const selection = selectCurve(project.jobType, taskType, cache);
-    const weeklyDemand = calculateTaskDemand(totalHours, selection.curve, project.workshopStartDate as Date, project.weeksInWorkshop);
+    CORE_TASK_FIELD_MAP.forEach(({ taskType, projectField }) => {
+      const totalHours = Number(project[projectField] || 0);
+      if (totalHours <= 0) return;
 
-    taskDemands.push({
-      taskType,
-      totalHours,
-      curveId: selection.curve.curveId,
-      curveVersion: selection.curve.version,
-      weeklyDemand,
+      const selection = selectCurve(project.jobType as string, taskType, cache);
+      if (selection.reason === 'flat-fallback-no-curve') anyFlatFallback = true;
+
+      const weeklyDemand = calculateTaskDemand(totalHours, selection.curve, project.workshopStartDate as Date, project.weeksInWorkshop);
+
+      taskDemands.push({
+        taskType,
+        totalHours,
+        curveId: selection.curve.curveId,
+        curveVersion: selection.curve.version,
+        curveReason: selection.reason,
+        weeklyDemand,
+      });
+
+      addDemandToBreakdown(breakdown, taskType, weeklyDemand);
     });
 
-    addDemandToBreakdown(breakdown, taskType, weeklyDemand);
-  });
+    if (anyFlatFallback) warnings.push('flat_fallback');
+  }
 
   const onsiteDemand = calculateOnsiteDemand(project);
   if (Object.keys(onsiteDemand).length > 0) {
@@ -254,7 +287,14 @@ export function calculateProjectDemand(
     probability: project.probability,
     taskDemands,
     breakdown,
+    warnings,
   };
+}
+
+export interface ProjectWarning {
+  projectId: string;
+  jobNumber: string;
+  tags: ProjectWarningTag[];
 }
 
 export function aggregateDemandForProjects(
@@ -266,27 +306,34 @@ export function aggregateDemandForProjects(
 ): {
   projectResults: ProjectDemandResult[];
   totals: WeeklyDemandBreakdown;
+  warnings: ProjectWarning[];
 } {
   const cache = buildCurveCache(curves, registry);
   const totals = createEmptyWeeklyDemand(planningWeeks);
   const projectResults: ProjectDemandResult[] = [];
+  const warnings: ProjectWarning[] = [];
 
   projects
     .filter((project) => project.probability >= probabilityThreshold)
     .forEach((project) => {
       const result = calculateProjectDemand(project, cache, planningWeeks);
-      if (!result) return;
       projectResults.push(result);
 
-      addDemandToBreakdown(totals, 'CNC', result.breakdown.cnc);
-      addDemandToBreakdown(totals, 'Build', result.breakdown.build);
-      addDemandToBreakdown(totals, 'Paint', result.breakdown.paint);
-      addDemandToBreakdown(totals, 'AV', result.breakdown.av);
-      addDemandToBreakdown(totals, 'Pack & Load', result.breakdown.packAndLoad);
-      addDemandToBreakdown(totals, 'Trades Install', result.breakdown.onsite);
+      if (result.warnings.length > 0) {
+        warnings.push({ projectId: result.projectId, jobNumber: result.jobNumber, tags: result.warnings });
+      }
+
+      if (result.taskDemands.length > 0) {
+        addDemandToBreakdown(totals, 'CNC', result.breakdown.cnc);
+        addDemandToBreakdown(totals, 'Build', result.breakdown.build);
+        addDemandToBreakdown(totals, 'Paint', result.breakdown.paint);
+        addDemandToBreakdown(totals, 'AV', result.breakdown.av);
+        addDemandToBreakdown(totals, 'Pack & Load', result.breakdown.packAndLoad);
+        addDemandToBreakdown(totals, 'Trades Install', result.breakdown.onsite);
+      }
     });
 
-  return { projectResults, totals };
+  return { projectResults, totals, warnings };
 }
 
 export function filterDemandToRange(

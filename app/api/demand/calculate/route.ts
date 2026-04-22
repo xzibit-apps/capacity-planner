@@ -10,11 +10,6 @@ import {
 } from '@/lib/capacityPlanning';
 import { aggregateDemandForProjects, chartLabelForISOWeek } from '@/lib/rulesEngine';
 
-function hasDemandInputs(project: Awaited<ReturnType<typeof fetchPlanningProjects>>[number]) {
-  const hasHours = project.cnc > 0 || project.build > 0 || project.paint > 0 || project.av > 0 || project.packAndLoad > 0 || project.tradeOnsite > 0;
-  return Boolean(project.jobType && project.workshopStartDate && project.weeksInWorkshop > 0 && hasHours);
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
@@ -29,9 +24,8 @@ export async function POST(request: NextRequest) {
       fetchCurveRegistry(),
     ]);
 
-    const eligibleProjects = projects.filter(hasDemandInputs);
     const planningWeeks = getWeekRange(startDate, endDate);
-    const demandResult = aggregateDemandForProjects(eligibleProjects, curves, registry, planningWeeks, probabilityThreshold);
+    const demandResult = aggregateDemandForProjects(projects, curves, registry, planningWeeks, probabilityThreshold);
 
     const demand = {
       ...demandResult.totals,
@@ -62,16 +56,20 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    const projectsWithDemand = demandResult.projectResults.filter((r) => r.taskDemands.length > 0);
+
     return NextResponse.json({
       weeks,
       demand,
-      projectDemands: demandResult.projectResults,
+      projectDemands: projectsWithDemand,
+      warnings: demandResult.warnings,
       meta: {
         totalProjects: projects.length,
-        eligibleProjects: eligibleProjects.length,
-        includedProjects: demandResult.projectResults.length,
+        eligibleProjects: projects.length,
+        includedProjects: projectsWithDemand.length,
         curveCount: curves.length,
         registryCount: registry.length,
+        warningCount: demandResult.warnings.length,
       },
     });
   } catch (error: any) {

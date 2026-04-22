@@ -374,6 +374,8 @@ export default function Dashboard() {
 
   const projects = projectsData || [];
   const staffCount = planningCapacityData?.meta?.staffCount || 0;
+  const apiWarnings: Array<{ projectId: string; jobNumber: string; tags: string[] }> =
+    planningDemandData?.warnings || [];
 
   const completeProjects = useMemo(() => {
     return projects.filter((project: any) => hasCompleteData(project));
@@ -436,6 +438,25 @@ export default function Dashboard() {
         : 0,
     }));
   }, [weeks, demand, capacity]);
+
+  const warningCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    apiWarnings.forEach(({ tags }) => {
+      tags.forEach((tag) => {
+        counts[tag] = (counts[tag] || 0) + 1;
+      });
+    });
+    return counts;
+  }, [apiWarnings]);
+
+  const WARNING_DISPLAY: Array<{ tag: string; label: string; pillClass: string }> = [
+    { tag: 'zero_weeks_to_build', label: 'Zero build weeks', pillClass: 'pill pill--coral' },
+    { tag: 'missing_truck_date', label: 'Missing truck date', pillClass: 'pill pill--amber' },
+    { tag: 'flat_fallback', label: 'Flat-curve fallback', pillClass: 'pill pill--lilac' },
+    { tag: 'job_type_missing', label: 'No job type', pillClass: 'pill pill--coral' },
+    { tag: 'job_type_no_curves', label: 'Job type has no curves', pillClass: 'pill pill--amber' },
+    { tag: 'ambiguous_probability', label: 'Ambiguous probability', pillClass: 'pill pill--sun' },
+  ];
 
   const pressureWeeks = useMemo(() => {
     return chartData
@@ -727,6 +748,28 @@ export default function Dashboard() {
           </Box>
         </CardContent>
       </Card>
+
+      {/* Data quality warnings */}
+      {Object.keys(warningCounts).length > 0 && (
+        <div className="card" style={{ padding: 'var(--xz-s-4)' }}>
+          <div className="card-head" style={{ marginBottom: 'var(--xz-s-3)' }}>
+            <div className="h3">Data quality warnings</div>
+            <div className="card-sub">Projects excluded from or degraded in the demand chart</div>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--xz-s-2)' }}>
+            {WARNING_DISPLAY.filter(({ tag }) => warningCounts[tag] > 0).map(({ tag, label, pillClass }) => (
+              <span
+                key={tag}
+                className={pillClass}
+                title={`${warningCounts[tag]} project${warningCounts[tag] === 1 ? '' : 's'} with ${tag}`}
+                style={{ cursor: 'default' }}
+              >
+                {label} ({warningCounts[tag]})
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Debug info */}
       <Card>
