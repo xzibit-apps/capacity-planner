@@ -77,8 +77,6 @@ export default function JobData() {
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [showArchived, setShowArchived] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-
   const { data: projectsData, isLoading: projectsLoading, error: projectsError } = useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
@@ -220,44 +218,6 @@ export default function JobData() {
     },
     onError: (error: any) => {
       setSnackbar({ open: true, message: 'Failed to import CSV', severity: 'error' });
-    },
-  });
-
-  const syncFromSheetsMutation = useMutation({
-    mutationFn: async () => {
-      setIsSyncing(true);
-      const response = await fetch('/api/google-sheets/import', {
-        method: 'POST',
-      });
-      if (!response.ok) throw new Error('Failed to sync from Google Sheets');
-      return response.json();
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      queryClient.invalidateQueries({ queryKey: ['jobTypes'] }); // Also refresh job types
-      setIsSyncing(false);
-      
-      let message = 'Data synced successfully from Google Sheets';
-      if (data.created > 0 || data.updated > 0) {
-        message = `Synced from Sheets: ${data.created} project(s) created, ${data.updated} project(s) updated`;
-        if (data.errors && data.errors.length > 0) {
-          message += ` (${data.errors.length} errors)`;
-        }
-      }
-      
-      setSnackbar({ 
-        open: true, 
-        message: message, 
-        severity: 'success' 
-      });
-    },
-    onError: (error: any) => {
-      setIsSyncing(false);
-      setSnackbar({ 
-        open: true, 
-        message: 'Failed to sync from Google Sheets', 
-        severity: 'error' 
-      });
     },
   });
 
@@ -732,14 +692,6 @@ export default function JobData() {
               Project management
             </Typography>
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-              <Button
-                variant="outlined"
-                startIcon={isSyncing ? <CircularProgress size={18} /> : <UploadIcon />}
-                onClick={() => syncFromSheetsMutation.mutate()}
-                disabled={isSyncing}
-              >
-                {isSyncing ? 'Syncing…' : 'Sync from Sheets'}
-              </Button>
               <Button
                 variant="outlined"
                 startIcon={<UploadIcon />}
