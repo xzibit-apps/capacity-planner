@@ -1,8 +1,12 @@
 import { google } from "googleapis";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyAdmin } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
   if (!spreadsheetId) {
@@ -20,12 +24,12 @@ export async function POST() {
     token_uri: "https://oauth2.googleapis.com/token",
   };
 
-  const auth = new google.auth.GoogleAuth({
+  const auth2 = new google.auth.GoogleAuth({
     credentials,
     scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
   });
 
-  const sheets = google.sheets({ version: "v4", auth });
+  const sheets = google.sheets({ version: "v4", auth: auth2 });
 
   try {
     const sheetMeta = await sheets.spreadsheets.get({ spreadsheetId });
@@ -45,12 +49,14 @@ export async function POST() {
     const jobsToImport = rows.slice(2);
     let createdCount = 0;
     let updatedCount = 0;
-    const errors: any[] = [];
+    const errors: Array<{ row: unknown; error: string }> = [];
 
     // Fetch all existing job types
     const { data: existingJobTypes } = await supabase.from('cp_job_types').select('mongo_id, name');
     const jobTypeMap: Record<string, string> = {};
-    (existingJobTypes || []).forEach(jt => { jobTypeMap[jt.name.toLowerCase()] = jt.mongo_id; });
+    (existingJobTypes || []).forEach((jt: Record<string, unknown>) => {
+      jobTypeMap[String(jt.name ?? '').toLowerCase()] = String(jt.mongo_id ?? '');
+    });
 
     for (const jobData of jobsToImport) {
       try {
@@ -90,8 +96,8 @@ export async function POST() {
               .insert({ mongo_id: newMongoId, name: jobType, description: 'Auto-created from Google Sheets sync', is_active: true })
               .select().single();
             if (newJt) {
-              jobTypeMap[key] = newJt.mongo_id;
-              jobTypeMongoId = newJt.mongo_id;
+              jobTypeMap[key] = (newJt as Record<string, unknown>).mongo_id as string;
+              jobTypeMongoId = (newJt as Record<string, unknown>).mongo_id;
             }
           }
         }
@@ -123,15 +129,15 @@ export async function POST() {
           .select('id, mongo_id').eq('job_number', jobNumber).single();
 
         if (existing) {
-          await supabase.from('cp_projects').update({ ...projectData, updated_at: new Date().toISOString() }).eq('id', existing.id);
+          await supabase.from('cp_projects').update({ ...projectData, updated_at: new Date().toISOString() }).eq('id', (existing as Record<string, unknown>).id);
           updatedCount++;
         } else {
           const mongoId = Date.now().toString(16) + Math.random().toString(16).slice(2, 10);
           await supabase.from('cp_projects').insert({ ...projectData, mongo_id: mongoId });
           createdCount++;
         }
-      } catch (error: any) {
-        errors.push({ row: jobData, error: error.message });
+      } catch (err: unknown) {
+        errors.push({ row: jobData, error: err instanceof Error ? err.message : 'Unknown error' });
       }
     }
 
@@ -143,7 +149,8 @@ export async function POST() {
       errors: errors.length > 0 ? errors : undefined,
       totalProcessed: jobsToImport.length,
     });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message || "Unknown error." }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

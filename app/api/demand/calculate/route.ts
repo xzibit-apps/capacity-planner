@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAuth } from '@/lib/auth';
 import {
   fetchCurveRegistry,
   fetchPlanningCurves,
@@ -11,6 +12,9 @@ import {
 import { aggregateDemandForProjects, chartLabelForISOWeek } from '@/lib/rulesEngine';
 
 export async function POST(request: NextRequest) {
+  const auth = await verifyAuth(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   try {
     const body = await request.json().catch(() => ({}));
     const startDate = toDate(body.startDate) || new Date();
@@ -72,9 +76,10 @@ export async function POST(request: NextRequest) {
         warningCount: demandResult.warnings.length,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to calculate demand', details: error?.message || 'Unknown error' },
+      { error: 'Failed to calculate demand', details: message },
       { status: 500 }
     );
   }
