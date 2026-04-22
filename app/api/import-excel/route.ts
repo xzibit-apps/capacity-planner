@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAdmin } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -31,7 +35,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Missing required headers: ${missingHeaders.join(', ')}` }, { status: 400 });
     }
 
-    const projects: any[] = [];
+    interface ProjectRecord {
+      name?: string;
+      truckDate?: string;
+      weeksBefore?: number;
+      probability?: number;
+      hoursBySkill?: Record<string, number>;
+      onsite?: { hours?: number; weeks?: number };
+      projectType?: string | null;
+      curveMode?: string;
+    }
+    const projects: ProjectRecord[] = [];
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -39,7 +53,7 @@ export async function POST(request: NextRequest) {
       const values = line.split(',').map(v => v.trim().replace(/^["']|["']$/g, ''));
       if (values.length < headers.length) continue;
 
-      const project: any = {};
+      const project: ProjectRecord = {};
       headers.forEach((header, index) => {
         const value = values[index] || '';
         switch (header) {
@@ -92,11 +106,12 @@ export async function POST(request: NextRequest) {
       };
 
       const { data: existing } = await supabase.from('cp_projects')
-        .select('id, mongo_id').eq('job_name', projectData.name).eq('truck_load_date', projectData.truckDate).single();
+        .select('id, mongo_id').eq('job_name', projectData.name!).eq('truck_load_date', projectData.truckDate!).single();
 
       if (existing) {
-        await supabase.from('cp_projects').update({ ...row, updated_at: new Date().toISOString() }).eq('id', existing.id);
-        resultIds.push(existing.mongo_id);
+        const existingRow = existing as Record<string, unknown>;
+        await supabase.from('cp_projects').update({ ...row, updated_at: new Date().toISOString() }).eq('id', existingRow.id);
+        resultIds.push(String(existingRow.mongo_id ?? ''));
         updatedCount++;
       } else {
         const mongoId = Date.now().toString(16) + Math.random().toString(16).slice(2, 10);
@@ -113,7 +128,8 @@ export async function POST(request: NextRequest) {
       updated: updatedCount,
       projectIds: resultIds,
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: 'Failed to import CSV file', details: error?.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: 'Failed to import CSV file', details: message }, { status: 500 });
   }
 }

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const auth = await verifyAuth(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   const { id } = await context.params;
   try {
     const leaveData = await request.json();
@@ -46,7 +50,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       .select('*').eq('staff_mongo_id', id);
     return NextResponse.json({
       message: 'Availability record added successfully',
-      leave: (allLeave || []).map(l => ({
+      leave: (allLeave || []).map((l: Record<string, unknown>) => ({
         _id: l.id,
         date: l.date || l.start_date,
         startDate: l.start_date || l.date,
@@ -54,9 +58,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         leaveType: l.leave_type || l.absence_type,
         absenceType: l.absence_type || l.leave_type,
         notes: l.notes,
-      }))
+      })),
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: 'Internal server error', details: error?.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: 'Internal server error', details: message }, { status: 500 });
   }
 }

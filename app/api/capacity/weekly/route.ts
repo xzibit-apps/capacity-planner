@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAuth } from '@/lib/auth';
 import {
   fetchMergedClosures,
   fetchPlanningStaff,
@@ -10,6 +11,9 @@ import { calculateWeeklyCapacity, capacityBreakdownToMap } from '@/lib/capacityE
 import { chartLabelForISOWeek } from '@/lib/rulesEngine';
 
 export async function GET(request: NextRequest) {
+  const auth = await verifyAuth(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const startDate = toDate(searchParams.get('startDate')) || new Date();
@@ -46,9 +50,10 @@ export async function GET(request: NextRequest) {
         jurisdictions,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to calculate capacity', details: error?.message || 'Unknown error' },
+      { error: 'Failed to calculate capacity', details: message },
       { status: 500 }
     );
   }

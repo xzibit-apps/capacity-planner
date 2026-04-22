@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAdmin } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 const VALID_STATUSES = new Set(['Draft', 'Active', 'Archived']);
@@ -7,6 +8,9 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ curveId: string }> }
 ) {
+  const auth = await verifyAdmin(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   try {
     const { curveId } = await context.params;
     const body = await request.json();

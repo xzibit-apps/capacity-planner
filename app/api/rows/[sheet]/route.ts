@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAuth, verifyAdmin } from '@/lib/auth';
 import { supabase, toRow } from '@/lib/supabase';
 import { z } from 'zod';
 
@@ -9,6 +10,9 @@ const deleteRowSchema = z.object({ _id: z.string() });
 const VALID_SHEETS = ['capacity', 'demand', 'supply', 'projects', 'staff', 'job-database'];
 
 export async function GET(request: NextRequest, context: { params: Promise<{ sheet: string }> }) {
+  const auth = await verifyAuth(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   const { sheet } = await context.params;
   try {
     if (!VALID_SHEETS.includes(sheet)) {
@@ -32,12 +36,16 @@ export async function GET(request: NextRequest, context: { params: Promise<{ she
       rows: (data || []).map(toRow),
       pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) }
     });
-  } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message || 'Failed to fetch rows' }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch rows';
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ sheet: string }> }) {
+  const auth = await verifyAdmin(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   const { sheet } = await context.params;
   try {
     if (!VALID_SHEETS.includes(sheet)) {
@@ -54,13 +62,17 @@ export async function POST(request: NextRequest, context: { params: Promise<{ sh
     }).select().single();
     if (error) throw error;
     return NextResponse.json({ ok: true, data: toRow(data) });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) return NextResponse.json({ ok: false, error: 'Invalid request data', details: error.errors }, { status: 400 });
-    return NextResponse.json({ ok: false, error: error?.message || 'Failed to create row' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to create row';
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ sheet: string }> }) {
+  const auth = await verifyAdmin(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   const { sheet } = await context.params;
   try {
     if (!VALID_SHEETS.includes(sheet)) {
@@ -74,19 +86,26 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ s
       .select('data').eq('mongo_id', validated._id).single();
     if (!current) return NextResponse.json({ ok: false, error: 'Row not found' }, { status: 404 });
 
-    const newData = { ...current.data, ...validated.changes };
+    const currentData = typeof (current as Record<string, unknown>).data === 'object' && (current as Record<string, unknown>).data !== null
+      ? (current as Record<string, unknown>).data as Record<string, unknown>
+      : {};
+    const newData = { ...currentData, ...validated.changes };
     const { data, error } = await supabase.from('cp_rows')
       .update({ data: newData, synced: false, updated_at: new Date().toISOString() })
       .eq('mongo_id', validated._id).select().single();
     if (error) throw error;
     return NextResponse.json({ ok: true, data: toRow(data) });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) return NextResponse.json({ ok: false, error: 'Invalid request data', details: error.errors }, { status: 400 });
-    return NextResponse.json({ ok: false, error: error?.message || 'Failed to update row' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to update row';
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
 
 export async function DELETE(request: NextRequest, context: { params: Promise<{ sheet: string }> }) {
+  const auth = await verifyAdmin(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   const { sheet } = await context.params;
   try {
     if (!VALID_SHEETS.includes(sheet)) {
@@ -98,8 +117,9 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       .delete().eq('mongo_id', validated._id).select().single();
     if (error || !data) return NextResponse.json({ ok: false, error: 'Row not found' }, { status: 404 });
     return NextResponse.json({ ok: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) return NextResponse.json({ ok: false, error: 'Invalid request data', details: error.errors }, { status: 400 });
-    return NextResponse.json({ ok: false, error: error?.message || 'Failed to delete row' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to delete row';
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
